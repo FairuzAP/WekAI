@@ -6,14 +6,18 @@
 package Classifier;
 
 import java.util.Enumeration;
-import java.util.Map;
 import java.util.TreeMap;
+
 import weka.classifiers.AbstractClassifier;
+
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
+
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.Discretize;
+import weka.filters.unsupervised.instance.RemoveWithValues;
+
 
 /**
  *
@@ -21,7 +25,7 @@ import weka.filters.supervised.attribute.Discretize;
  */
 public class NaiveBayesClassifier extends AbstractClassifier {
     
-    /** The discretize filter used to discretize the test data */
+    /** The discretize removeFilter used to discretize the test data */
     private Discretize discretizeFilter;
     
     /** The training data used by the classifier */
@@ -32,6 +36,11 @@ public class NaiveBayesClassifier extends AbstractClassifier {
      * ClassAttributeDomainValue -> NonClassAttribute -> NonClassAttributeDomainValue -> Probability
      */
     private final TreeMap<String,TreeMap<String,TreeMap<String,Float>>> ProbabilityMatrix = new TreeMap<>();
+    /**
+     * A map between a class attribute value and the probabilty of that value
+     */
+    private final TreeMap<String,Float> ProbMatrixClass = new TreeMap<>();
+    
     
     /**
      * Generates a classifier. Must initialize all fields of the classifier that 
@@ -54,6 +63,8 @@ public class NaiveBayesClassifier extends AbstractClassifier {
 	discretizeFilter.setInputFormat(data);
 	trainingData = Filter.useFilter(data, discretizeFilter);
 	
+	RemoveWithValues removeFilter = new RemoveWithValues();
+	removeFilter.setInvertSelection(true);
 	
 	// For each of the class attributes domain value in the instances,
 	Attribute classAttribute = trainingData.classAttribute();
@@ -63,6 +74,16 @@ public class NaiveBayesClassifier extends AbstractClassifier {
 	    // Prepare a sub-tree to contain each of the non-class atributes tree
 	    String classValueString = enumerateDomainValues.nextElement().toString();
 	    ProbabilityMatrix.put(classValueString, new TreeMap<>());
+	    
+	    // Get a sub-data where the class-value is classValueString
+	    removeFilter.setAttributeIndex("" + (trainingData.classIndex()+1));
+	    removeFilter.setNominalIndices("" + (classAttribute.indexOfValue(classValueString)+1));
+	    removeFilter.setInputFormat(trainingData);
+	    Instances subDataClassValue = Filter.useFilter(trainingData, removeFilter);
+	    
+	    // Insert the probability of this class values
+	    float prob2 = (float)subDataClassValue.size() / trainingData.size();
+	    ProbMatrixClass.put(classValueString, prob2);
 	    
 	    // For each of the attributes in the instances,
 	    Enumeration<Attribute> enumerateAttributes = trainingData.enumerateAttributes();
@@ -75,10 +96,17 @@ public class NaiveBayesClassifier extends AbstractClassifier {
 		// For each of this attributes possible domain value
 		Enumeration<Object> enumerateValues = currAttributes.enumerateValues();
 		while(enumerateValues.hasMoreElements()) {
-
-		    // Put the probability value for this classValue, attribute, and attValue
+		    
+		    // Insert the probability of this attributes values at the current class att values
 		    String currAttDomain = enumerateValues.nextElement().toString();
-		    float prob = countProb(classValueString, currAttributes.name(), currAttDomain);
+		    
+		    // Get a sub-data where the currAttributes value is currAttDomain
+		    removeFilter.setAttributeIndex("" + (currAttributes.index()+1) );
+		    removeFilter.setNominalIndices("" + (currAttributes.indexOfValue(currAttDomain)+1) );
+		    removeFilter.setInputFormat(subDataClassValue);
+		    Instances subDataAttValues = Filter.useFilter(subDataClassValue, removeFilter);
+		    
+		    float prob = (float)subDataAttValues.size() / subDataClassValue.size();
 		    ProbabilityMatrix.get(classValueString).get(currAttributes.name()).put(currAttDomain, prob);
 
 		}
@@ -87,13 +115,17 @@ public class NaiveBayesClassifier extends AbstractClassifier {
 	    
 	}
 	
-	System.out.print(ProbabilityMatrix.toString());
-	
     }
     
-    private float countProb(String classValue, String attName, String attValue) {
-	return Float.NaN;
+    
+    /**
+     * Return the partial probability of the attributeName value to be 
+     * attribute value if the class attribute value is classDomainValue
+     */
+    private float getPartialProbability(String classDomainValue, String attributeName, String attributeValue) {
+	return ProbabilityMatrix.get(classDomainValue).get(attributeName).get(attributeValue);
     }
+    
     
     /**
      * Predicts the class memberships for a given instance. If an instance is 
@@ -111,7 +143,37 @@ public class NaiveBayesClassifier extends AbstractClassifier {
      */
     @Override
     public double[] distributionForInstance(Instance instance) throws Exception {
-	throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+	
+	// Preprocess the instance (discretize using the same filter)
+	Instances Result = new Instances(trainingData,0);
+	Result.setClassIndex(trainingData.classIndex());
+	Result.add(instance);
+	Result = Filter.useFilter(Result, discretizeFilter);
+	
+	// Initialize the result array by assigning the probability of each class value
+	double[] prob = new double[Result.classAttribute().numValues()];
+	for(int i=0; i<Result.classAttribute().numValues(); i++) {
+	    prob[i] = ProbMatrixClass.get(Result.classAttribute().value(i));
+	}
+	
+	// For all the Non-Class attribute in the instance,
+	Enumeration<Attribute> enumerateAttributes = Result.enumerateAttributes();
+	while(enumerateAttributes.hasMoreElements()) {
+	    
+	    // For all the possible class domain value,
+	    Attribute currAtt = enumerateAttributes.nextElement();
+	    for(int i=0; i<Result.classAttribute().numValues(); i++) {
+		
+		String classValue = Result.classAttribute().value(i);
+		String attName = currAtt.name();
+		String attValue = currAtt.value((int) Result.firstInstance().value(currAtt));
+		prob[i] *= getPartialProbability(classValue, attName, attValue);
+	    
+	    }
+	    
+	}
+	
+	return prob;
     }
     
 }

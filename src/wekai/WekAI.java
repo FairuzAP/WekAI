@@ -21,10 +21,13 @@ public class WekAI {
     public static void main(String[] args) {
 	
 	try {
+	    
 	    WekaHandler w = new WekaHandler();
 	    w.readData("C:/Program Files/Weka-3-8/data/iris.arff");
 	    NaiveBayesClassifier n = new NaiveBayesClassifier();
-	    n.buildClassifier(w.Data);
+	    // w.Model = n;
+	    w.tenFoldCrossValidation();
+	    
 	} catch (Exception ex) {
 	    Logger.getLogger(WekAI.class.getName()).log(Level.SEVERE, null, ex);
 	}
