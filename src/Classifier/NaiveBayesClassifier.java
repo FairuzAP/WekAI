@@ -71,7 +71,7 @@ public class NaiveBayesClassifier extends AbstractClassifier {
 	Enumeration<Object> enumerateDomainValues = classAttribute.enumerateValues();
 	while(enumerateDomainValues.hasMoreElements()) {
 	    
-	    // Prepare a sub-tree to contain each of the non-class atributes tree
+	    // Prepare a sub-tree to contain each of the class attribute value
 	    String classValueString = enumerateDomainValues.nextElement().toString();
 	    ProbabilityMatrix.put(classValueString, new TreeMap<>());
 	    

@@ -25,7 +25,7 @@ public class WekAI {
 	    WekaHandler w = new WekaHandler();
 	    w.readData("C:/Program Files/Weka-3-8/data/iris.arff");
 	    NaiveBayesClassifier n = new NaiveBayesClassifier();
-	    // w.Model = n;
+	    w.Model = n;
 	    w.tenFoldCrossValidation();
 	    
 	} catch (Exception ex) {
