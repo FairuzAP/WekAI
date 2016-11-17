@@ -65,7 +65,11 @@ public class FFNNClassifier extends AbstractClassifier {
 	public double getOutput() {
 	    return 1/(1+Math.exp(-(getRawOutput())));
 	}
-
+	
+	public double getWeight(int index) {
+	    return InputWeight.get(index);
+	}
+	
 	
 	/** Improve each of the InputWeight entry according to the error value */
 	public void learn(double rate, double error) {
@@ -94,7 +98,6 @@ public class FFNNClassifier extends AbstractClassifier {
 	 * @param perceptronCount A vector with size hidLayerCount+2, the 0th 
 	 *  index contains the input-count, the last index contains the output
 	 *  perceptron count, the rest is hidden layer perceptron count
-	 * @param inputCount The number of input the first perceptron layer will get
 	 */
 	public MultiLayerPerceptron(int hidLayerCount, Vector<Integer> perceptronCount) {
 	    
@@ -163,7 +166,49 @@ public class FFNNClassifier extends AbstractClassifier {
 	 * For the hidden layer, calculate the error with a sigmoid function
 	 */
 	public void backPropragate(double rate, Vector<Double> err) {
+	    
+	    // Prepare the vector containing each perceptron's error
+	    Vector<Vector<Double>> MLPErr = new Vector<>();
+	    MLPErr.add(err);
+	    
+	    // For each layer other than the output layer, starting from the back
+	    for(int i=MLP.size()-2; i>=0; i--) {
+		
+		// Insert the next layer from the front
+		MLPErr.insertElementAt(new Vector<>(),0);
+		
+		// For every perceptron in this layer
+		for(int j=0; j<MLP.get(i).size(); j++) {
+		    
+		    // Calculate the error
+		    double out = MLP.get(i).get(j).getOutput();
+		    double error = 0.0;
+		    
+		    // For every perceptron in the next layer
+		    for(int k=0; k<MLP.get(i+1).size(); k++) {
+			
+			// Add the weight of the input from the calculated perceptron
+			// times the error of this perceptron
+			error+= MLP.get(i+1).get(k).getWeight(j+1) * MLPErr.get(1).get(k);
+		
+		    }
+		    
+		    error *= out*(1-out);
+		    MLPErr.get(0).add(error);
+		
+		}
+		
+	    }
+	    
+	    // Update the weight of all perceptron from the front
+	    for(int i=0; i<MLP.size(); i++) {
+		for(int j=0; j<MLP.get(i).size(); j++) {
+		    MLP.get(i).get(j).learn(rate, MLPErr.get(i).get(j));
+		}
+	    }
+	    
 	}
+	
 	
     }
     
