@@ -142,7 +142,22 @@ public class FFNNClassifier extends AbstractClassifier {
 	 * @return the output of the last perceptron layer after propragation
 	 */
 	public Vector<Double> frontPropragate() {
-	    return getOutputs();
+            //Looping layer
+            for (int i = 0; i < MLP.size()-1; i++) {
+                
+                //Looping neuron
+                for (int j = 0; j < MLP.get(i).size(); j++){
+                    double o = MLP.get(i).get(j).getOutput();
+                    
+                    
+                    for (int k = 0; k < MLP.get(i+1).size(); k++){
+                        MLP.get(i+1).get(k).setValue(j+1, o);
+                    }
+                        
+                }
+                
+            }
+            return getOutputs();
 	}
 
 	/**
