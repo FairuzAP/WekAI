@@ -6,18 +6,24 @@
 package Classifier;
 
 import java.util.Random;
+import java.util.Scanner;
 import java.util.Vector;
 import weka.classifiers.AbstractClassifier;
 import weka.core.Instance;
 import weka.core.Instances;
 
+import weka.filters.Filter;
+import weka.filters.unsupervised.instance.RemoveWithValues;
 /**
  *
  * @author USER
  */
 public class FFNNClassifier extends AbstractClassifier {    
-    
-    
+
+    private MultiLayerPerceptron MLP;
+    private double learningRate = 0.1;
+    Vector<Vector<Double>> dataInput = new Vector<>();
+
     /** A single perceptron container/helper class */
     private class Perceptron {
 
@@ -51,7 +57,6 @@ public class FFNNClassifier extends AbstractClassifier {
 	    InputValue.set(index, value);
 	}
 
-	
 	/** Return the sum of all input's value times weight */
 	public double getRawOutput() {
 	    double res = 0;
@@ -69,8 +74,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	public double getWeight(int index) {
 	    return InputWeight.get(index);
 	}
-	
-	
+
 	/** Improve each of the InputWeight entry according to the error value */
 	public void learn(double rate, double error) {
 	    for(int i=0; i<InputWeight.size(); i++) {
@@ -80,8 +84,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	}
 
     }
-    
-    
+
     /** A multi-layer perceptron container/helper class */
     private class MultiLayerPerceptron {
 	
@@ -116,25 +119,21 @@ public class FFNNClassifier extends AbstractClassifier {
 		    for(int k=0; k<perceptronCount.get(i-1); k++) {
 			MLP.get(i-1).get(j).addInput(0);
 		    }
-		    
 		}
-		
 	    }
-	    
 	}
-	
-	
+
 	/** 
 	 * Set the input value for each of the first layer perceptron
 	 * The size of vector must equal to the inputCount supplied at constructor
 	 */
 	public void setInputs(Vector<Double> Input) {
-	    int i=1;
+            int i = 1;
 	    for(double d : Input) {
-		for(int j=0; j<MLP.get(0).size(); j++) {
-		    MLP.get(0).get(j).setValue(i, d);
-		}
-		i++;
+                for(int j=0; j<MLP.get(0).size(); j++) {
+                    MLP.get(0).get(j).setValue(i, d);
+                }
+                i++;
 	    }
 	}
 	
@@ -145,8 +144,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	public Vector<Double> frontPropragate() {
 	    return getOutputs();
 	}
-	
-	
+
 	/**
 	 * Return the output OF ALL perceptron in the last layer with a sigmoid 
 	 * activation function
@@ -158,8 +156,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	    }
 	    return res;
 	}
-	
-	
+
 	/**
 	 * Improve each of the InputWeight entry of each Perceptron.
 	 * Err is the error for each of the last-layer perceptron.
@@ -173,46 +170,39 @@ public class FFNNClassifier extends AbstractClassifier {
 	    
 	    // For each layer other than the output layer, starting from the back
 	    for(int i=MLP.size()-2; i>=0; i--) {
-		
-		// Insert the next layer from the front
-		MLPErr.insertElementAt(new Vector<>(),0);
-		
-		// For every perceptron in this layer
-		for(int j=0; j<MLP.get(i).size(); j++) {
-		    
-		    // Calculate the error
-		    double out = MLP.get(i).get(j).getOutput();
-		    double error = 0.0;
-		    
-		    // For every perceptron in the next layer
-		    for(int k=0; k<MLP.get(i+1).size(); k++) {
-			
-			// Add the weight of the input from the calculated perceptron
-			// times the error of this perceptron
-			error+= MLP.get(i+1).get(k).getWeight(j+1) * MLPErr.get(1).get(k);
-		
-		    }
-		    
-		    error *= out*(1-out);
-		    MLPErr.get(0).add(error);
-		
-		}
-		
+
+                // Insert the next layer from the front
+                MLPErr.insertElementAt(new Vector<>(),0);
+
+                // For every perceptron in this layer
+                for(int j=0; j<MLP.get(i).size(); j++) {
+
+                    // Calculate the error
+                    double out = MLP.get(i).get(j).getOutput();
+                    double error = 0.0;
+
+                    // For every perceptron in the next layer
+                    for(int k=0; k<MLP.get(i+1).size(); k++) {
+
+                        // Add the weight of the input from the calculated perceptron
+                        // times the error of this perceptron
+                        error+= MLP.get(i+1).get(k).getWeight(j+1) * MLPErr.get(1).get(k);
+
+                    }
+
+                    error *= out*(1-out);
+                    MLPErr.get(0).add(error);
+                }
 	    }
-	    
 	    // Update the weight of all perceptron from the front
 	    for(int i=0; i<MLP.size(); i++) {
 		for(int j=0; j<MLP.get(i).size(); j++) {
 		    MLP.get(i).get(j).learn(rate, MLPErr.get(i).get(j));
 		}
 	    }
-	    
 	}
-	
-	
     }
-    
-    
+
     /**
      * Generates a classifier. Must initialize all fields of the classifier that 
      * are not being set via options (ie. multiple calls of buildClassifier must 
@@ -223,6 +213,44 @@ public class FFNNClassifier extends AbstractClassifier {
      */
     @Override
     public void buildClassifier(Instances data) throws Exception {
+        int maxEpoch = 10;
+        int epoch = 0;
+        double target = 0.5;
+        double epochError = target + 1;
+
+        int hiddenCount = 1;
+        Vector<Integer> perceptronCount = new Vector<>();
+
+        int inputCount = data.numAttributes();
+//        int outputCount = data.numClasses();
+        Scanner in = new Scanner(System.in);
+        System.out.println("masukkan jumlah node pada hidden layer : ");
+        int x = in.nextInt();
+        perceptronCount.add(inputCount);
+        perceptronCount.add(x);
+        perceptronCount.add(data.numClasses());
+        MLP = new MultiLayerPerceptron(hiddenCount, perceptronCount);
+
+        for (int i = 0; i < inputCount; i++) {
+            dataInput.add(new Vector<>());
+        }
+
+        for (int i = 0; i < data.numInstances(); i++) {
+            Instance currData = data.get(i);
+            for (int j = 0; j < inputCount; j++) {
+                dataInput.get(j).add(currData.value(j));
+            }
+        }
+
+        do {
+            epoch++;
+            for (int i = 0; i < data.numInstances(); i++) {
+                MLP.setInputs(dataInput.get(i));
+                MLP.frontPropragate();
+                MLP.backPropragate(learningRate, errorCount());
+            }
+            epochError = epochErrorCount(data);
+        } while ((epochError >= target) && (epoch < maxEpoch));
     }
     
     /**
@@ -239,5 +267,42 @@ public class FFNNClassifier extends AbstractClassifier {
     public double classifyInstance(Instance instance) throws Exception {
 	return 0;
     }
-    
+
+    private Vector<Double> errorCount() {
+        Vector<Double> output = MLP.getOutputs();
+        double max = output.get(0);
+        for (int i = 1; i < output.capacity(); i++) {
+            if (max < output.get(i)) {
+                max = output.get(i);
+            }
+        }
+        Vector<Double> errorClass = new Vector<>();
+        for (int i = 0; i < output.capacity(); i++) {
+            double err;
+            if (max == output.get(i)) {
+                double outVal = output.get(i);
+                err = outVal * (1 - outVal) * (1 - outVal);
+            } else {
+                double outVal = output.get(i);
+                err = outVal * (1 - outVal) * (0 - outVal);
+            }
+            errorClass.add(err);
+        }
+        return errorClass;
+    }
+
+    private double epochErrorCount(Instances data) {
+        double error = 0;
+        Vector<Double> errorClass = new Vector<>();
+        for (int i = 0; i < data.numInstances(); i++) {
+            MLP.setInputs(dataInput.get(i));
+            MLP.frontPropragate();
+            errorClass = errorCount();
+            for (int j = 0; j < errorClass.capacity(); j++) {
+                error = error + errorClass.get(j);
+            }
+        }
+        return error;
+    }
+
 }
