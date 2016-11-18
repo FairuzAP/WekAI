@@ -5,10 +5,12 @@
  */
 package Classifier;
 
+import java.util.Enumeration;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.Vector;
 import weka.classifiers.AbstractClassifier;
+import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
 
@@ -20,10 +22,7 @@ import weka.filters.unsupervised.instance.RemoveWithValues;
  */
 public class FFNNClassifier extends AbstractClassifier {    
 
-    private MultiLayerPerceptron MLP;
-    private double learningRate = 0.1;
-    Vector<Vector<Double>> dataInput = new Vector<>();
-
+    
     /** A single perceptron container/helper class */
     private class Perceptron {
 
@@ -75,7 +74,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	    return InputWeight.get(index);
 	}
 
-	/** Improve each of the InputWeight entry according to the error value */
+	/** Improve each of the InputWeight entry according to the totError value */
 	public void learn(double rate, double error) {
 	    for(int i=0; i<InputWeight.size(); i++) {
 		double newWeight = InputWeight.get(i) + rate*error*InputValue.get(i);
@@ -85,6 +84,7 @@ public class FFNNClassifier extends AbstractClassifier {
 
     }
 
+    
     /** A multi-layer perceptron container/helper class */
     private class MultiLayerPerceptron {
 	
@@ -149,7 +149,6 @@ public class FFNNClassifier extends AbstractClassifier {
                 for (int j = 0; j < MLP.get(i).size(); j++){
                     double o = MLP.get(i).get(j).getOutput();
                     
-                    
                     for (int k = 0; k < MLP.get(i+1).size(); k++){
                         MLP.get(i+1).get(k).setValue(j+1, o);
                     }
@@ -174,12 +173,12 @@ public class FFNNClassifier extends AbstractClassifier {
 
 	/**
 	 * Improve each of the InputWeight entry of each Perceptron.
-	 * Err is the error for each of the last-layer perceptron.
-	 * For the hidden layer, calculate the error with a sigmoid function
+	 * Err is the totError for each of the last-layer perceptron.
+	 * For the hidden layer, calculate the totError with a sigmoid function
 	 */
 	public void backPropragate(double rate, Vector<Double> err) {
 	    
-	    // Prepare the vector containing each perceptron's error
+	    // Prepare the vector containing each perceptron's totError
 	    Vector<Vector<Double>> MLPErr = new Vector<>();
 	    MLPErr.add(err);
 	    
@@ -192,7 +191,7 @@ public class FFNNClassifier extends AbstractClassifier {
                 // For every perceptron in this layer
                 for(int j=0; j<MLP.get(i).size(); j++) {
 
-                    // Calculate the error
+                    // Calculate the totError
                     double out = MLP.get(i).get(j).getOutput();
                     double error = 0.0;
 
@@ -200,7 +199,7 @@ public class FFNNClassifier extends AbstractClassifier {
                     for(int k=0; k<MLP.get(i+1).size(); k++) {
 
                         // Add the weight of the input from the calculated perceptron
-                        // times the error of this perceptron
+                        // times the totError of this perceptron
                         error+= MLP.get(i+1).get(k).getWeight(j+1) * MLPErr.get(1).get(k);
 
                     }
@@ -217,54 +216,68 @@ public class FFNNClassifier extends AbstractClassifier {
 	    }
 	}
     }
-
+    
+    /** The training data used by the classifier */
+    private Instances trainingData;
+    
+    /** The MLP-model used by rhis classifier */
+    private MultiLayerPerceptron MLP;
+    
+    /** Learning paramater and stop condition */
+    private double learningRate = 0.1;
+    int maxEpoch = 10;
+    double target = 0.5;
+    
+    /** The vector containing how many perceptron in each requested hidden layer */
+    Vector<Integer> perceptronCount = new Vector<>();
+    
+    // ???
+    Vector<Vector<Double>> dataInput;
+    
+    
     /**
      * Generates a classifier. Must initialize all fields of the classifier that 
      * are not being set via options (ie. multiple calls of buildClassifier must 
      * always lead to the same result). Must not change the dataset in any way.
      *
-     * @param data set of instances serving as training data
+     * @param trainingData set of instances serving as training trainingData
      * @exception Exception if the classifier has not been generated successfully
      */
     @Override
     public void buildClassifier(Instances data) throws Exception {
-        int maxEpoch = 10;
-        int epoch = 0;
-        double target = 0.5;
-        double epochError = target + 1;
-
-        int hiddenCount = 1;
-        Vector<Integer> perceptronCount = new Vector<>();
-
-        int inputCount = data.numAttributes();
-//        int outputCount = data.numClasses();
-        Scanner in = new Scanner(System.in);
-        System.out.println("masukkan jumlah node pada hidden layer : ");
-        int x = in.nextInt();
-        perceptronCount.add(inputCount);
-        perceptronCount.add(x);
-        perceptronCount.add(data.numClasses());
+	
+	// Data initialization and reading
+	trainingData = new Instances(data);
+	int hiddenCount = perceptronCount.size(); 
+        int inputCount = trainingData.numAttributes() - 1;
+	perceptronCount.insertElementAt(inputCount, 0);
+	int outputCount = trainingData.classAttribute().numValues();
+	perceptronCount.add(outputCount);
+	
+	// Initialize the MLP-model
         MLP = new MultiLayerPerceptron(hiddenCount, perceptronCount);
-
-        for (int i = 0; i < inputCount; i++) {
+	
+	// hmm,.. redundan sih dataInput itu, nggak bisa diakses berdasarkan konteks juga
+        for (int i=0; i < inputCount; i++) {
             dataInput.add(new Vector<>());
-        }
-
-        for (int i = 0; i < data.numInstances(); i++) {
-            Instance currData = data.get(i);
+        }	
+        for (int i = 0; i < trainingData.numInstances(); i++) {
+            Instance currData = trainingData.get(i);
             for (int j = 0; j < inputCount; j++) {
                 dataInput.get(j).add(currData.value(j));
             }
         }
-
+	
+	int epoch = 0;
+	double epochError;
         do {
             epoch++;
-            for (int i = 0; i < data.numInstances(); i++) {
+            for (int i = 0; i < trainingData.numInstances(); i++) {
                 MLP.setInputs(dataInput.get(i));
                 MLP.frontPropragate();
                 MLP.backPropragate(learningRate, errorCount());
             }
-            epochError = epochErrorCount(data);
+            epochError = epochErrorCount();
         } while ((epochError >= target) && (epoch < maxEpoch));
     }
     
@@ -276,23 +289,56 @@ public class FFNNClassifier extends AbstractClassifier {
      * @param instance the instance to be classified
      * @return the predicted most likely class for the instance or
      *         Utils.missingValue() if no prediction is made
-     * @exception Exception if an error occurred during the prediction
+     * @throws Exception if an totError occurred during the prediction
      */
     @Override
     public double classifyInstance(Instance instance) throws Exception {
-	return 0;
+	
+	// Preprocess the instance 
+	Instances newInstances = new Instances(trainingData,0);
+	newInstances.setClassIndex(trainingData.classIndex());
+	newInstances.add(instance);
+	
+	// Store every non-class attribute value as double of this instances to a vector
+	Vector<Double> in = new Vector<>(); 
+	Enumeration<Attribute> enumerateAttributes = newInstances.enumerateAttributes();
+	while(enumerateAttributes.hasMoreElements()) {
+	    in.add(newInstances.get(0).value(enumerateAttributes.nextElement()));
+	}
+	
+	// Propagate the input through the learned MLP-model
+	MLP.setInputs(in);
+	Vector<Double> frontPropragate = MLP.frontPropragate();
+	
+	// Search for the index of output perceptron with the highest value
+	double iMax = 0;
+	double vMax = 0;
+	for(int i=0; i<frontPropragate.size(); i++) {
+	    if(frontPropragate.get(i)>vMax) {
+		iMax = i;
+		vMax = frontPropragate.get(i);
+	    }
+	}
+	
+	return iMax;
     }
-
+    
     private Vector<Double> errorCount() {
+	
+	// Fetch the output and maxOutput of the MLP 
         Vector<Double> output = MLP.getOutputs();
         double max = output.get(0);
-        for (int i = 1; i < output.capacity(); i++) {
+        for (int i=1; i < output.size(); i++) {
             if (max < output.get(i)) {
                 max = output.get(i);
             }
         }
+	
+	// NEED TO HANDLE IF ONLY ONE OUTPUT PERCEPTRON,
+	
+	// ... J, ini kamu tahu target-nya dari mana?..
         Vector<Double> errorClass = new Vector<>();
-        for (int i = 0; i < output.capacity(); i++) {
+        for (int i=0; i < output.size(); i++) {
             double err;
             if (max == output.get(i)) {
                 double outVal = output.get(i);
@@ -303,21 +349,36 @@ public class FFNNClassifier extends AbstractClassifier {
             }
             errorClass.add(err);
         }
+	
         return errorClass;
     }
-
-    private double epochErrorCount(Instances data) {
-        double error = 0;
+    
+    /**
+     * Count and return the sum of half-squared error the current MLP produce
+     * for the training data
+     */
+    private double epochErrorCount() {
+	
+	// Variables Initialization
+        double totError = 0;
         Vector<Double> errorClass = new Vector<>();
-        for (int i = 0; i < data.numInstances(); i++) {
+        
+	// For all instance in the traningData,
+	for (int i=0; i < trainingData.numInstances(); i++) {
+	    
+	    // Front propagate the value of this instance
             MLP.setInputs(dataInput.get(i));
             MLP.frontPropragate();
+	    
+	    // Count the totError and add the ((error)^2)/2 of all error to the totError
             errorClass = errorCount();
-            for (int j = 0; j < errorClass.capacity(); j++) {
-                error = error + errorClass.get(j);
+            for (int j=0; j < errorClass.size(); j++) {
+                totError = totError + Math.pow(errorClass.get(j),2)/2;
             }
+	    
         }
-        return error;
+	
+        return totError;
     }
 
 }
