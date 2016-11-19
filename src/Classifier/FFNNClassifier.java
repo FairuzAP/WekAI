@@ -5,6 +5,7 @@
  */
 package Classifier;
 
+import java.io.Serializable;
 import java.util.Enumeration;
 import java.util.Random;
 import java.util.Scanner;
@@ -16,231 +17,34 @@ import weka.core.Instances;
 
 import weka.filters.Filter;
 import weka.filters.unsupervised.instance.RemoveWithValues;
+
 /**
  *
  * @author USER
  */
-public class FFNNClassifier extends AbstractClassifier {    
-
-    
-    /** A single perceptron container/helper class */
-    private class Perceptron {
-
-	/**
-	 * The value and weight of all of this perceptron input 
-	 * w0 is in index 0 and always had the value of 1
-	 */
-	private final Vector<Double> InputValue = new Vector<>();
-	private final Vector<Double> InputWeight = new Vector<>();
-
-	Random rand = new Random();
-
-
-	/** Intiate the perceptron, add x0 with value 1 and a random weight */
-	public Perceptron() {
-	    rand.setSeed(System.currentTimeMillis());
-	    InputValue.add(1.0);
-	    InputWeight.add(rand.nextDouble());
-	}
-
-	
-	/** Add another input with a random weight, return the new input weight */
-	public int addInput(double value) {
-	    InputValue.add(value);
-	    InputWeight.add(rand.nextDouble());
-	    return InputValue.size()-1;
-	}
-
-	/** Set the value of this input to the paramater's */
-	public void setValue(int index, double value) {
-	    InputValue.set(index, value);
-	}
-
-	/** Return the sum of all input's value times weight */
-	public double getRawOutput() {
-	    double res = 0;
-	    for(int i=0; i<InputValue.size(); i++) {
-		res+= InputValue.get(i) * InputWeight.get(i);
-	    }
-	    return res;
-	}
-
-	/** Return the output with a sigmoid activation function */
-	public double getOutput() {
-	    return 1/(1+Math.exp(-(getRawOutput())));
-	}
-	
-	public double getWeight(int index) {
-	    return InputWeight.get(index);
-	}
-
-	/** Improve each of the InputWeight entry according to the totError value */
-	public void learn(double rate, double error) {
-	    for(int i=0; i<InputWeight.size(); i++) {
-		double newWeight = InputWeight.get(i) + rate*error*InputValue.get(i);
-		InputWeight.set(i, newWeight);
-	    }
-	}
-
-    }
-
-    
-    /** A multi-layer perceptron container/helper class */
-    private class MultiLayerPerceptron {
-	
-	/**
-	 * An array of Perceptron layer, The output is the layer at the last index
-	 * Anything else is a hidden layer
-	 */
-	private final Vector<Vector<Perceptron>> MLP = new Vector<>();
-	
-	
-	/**
-	 * An MLP constructor
-	 * @param hidLayerCount The amount of hidden layer in this MLP
-	 * @param perceptronCount A vector with size hidLayerCount+2, the 0th 
-	 *  index contains the input-count, the last index contains the output
-	 *  perceptron count, the rest is hidden layer perceptron count
-	 */
-	public MultiLayerPerceptron(int hidLayerCount, Vector<Integer> perceptronCount) {
-	    
-	    // For each requested layer; including the output layer..
-	    // Skip the first index because it contains the input count
-	    for(int i=1; i<=hidLayerCount+1; i++) {
-		MLP.add(new Vector<>());
-		
-		// Create the requested perceptron in this layer
-		for(int j=0; j<perceptronCount.get(i); j++) {
-		    MLP.get(i-1).add(new Perceptron());
-		    
-		    // Prepare the input from the previous layer. In case of
-		    // first layer, will fetch perceptronCount[0], which is 
-		    // the input count
-		    for(int k=0; k<perceptronCount.get(i-1); k++) {
-			MLP.get(i-1).get(j).addInput(0);
-		    }
-		}
-	    }
-	}
-
-	/** 
-	 * Set the input value for each of the first layer perceptron
-	 * The size of vector must equal to the inputCount supplied at constructor
-	 */
-	public void setInputs(Vector<Double> Input) {
-            int i = 1;
-	    for(double d : Input) {
-                for(int j=0; j<MLP.get(0).size(); j++) {
-                    MLP.get(0).get(j).setValue(i, d);
-                }
-                i++;
-	    }
-	}
-	
-	/** 
-	 * Front-propragate the input value to the last layer 
-	 * @return the output of the last perceptron layer after propragation
-	 */
-	public Vector<Double> frontPropragate() {
-            //Looping layer
-            for (int i = 0; i < MLP.size()-1; i++) {
-                
-                //Looping neuron
-                for (int j = 0; j < MLP.get(i).size(); j++){
-                    double o = MLP.get(i).get(j).getOutput();
-                    
-                    for (int k = 0; k < MLP.get(i+1).size(); k++){
-                        MLP.get(i+1).get(k).setValue(j+1, o);
-                    }
-                        
-                }
-                
-            }
-            return getOutputs();
-	}
-
-	/**
-	 * Return the output OF ALL perceptron in the last layer with a sigmoid 
-	 * activation function
-	 */
-	public Vector<Double> getOutputs() {
-	    Vector<Double> res = new Vector<>();
-	    for(int i=0; i<MLP.get(MLP.size()-1).size(); i++) {
-		res.add(MLP.get(MLP.size()-1).get(i).getOutput());
-	    }
-	    return res;
-	}
-
-	/**
-	 * Improve each of the InputWeight entry of each Perceptron.
-	 * Err is the totError for each of the last-layer perceptron.
-	 * For the hidden layer, calculate the totError with a sigmoid function
-	 */
-	public void backPropragate(double rate, Vector<Double> err) {
-	    
-	    // Prepare the vector containing each perceptron's totError
-	    Vector<Vector<Double>> MLPErr = new Vector<>();
-	    MLPErr.add(err);
-	    
-	    // For each layer other than the output layer, starting from the back
-	    for(int i=MLP.size()-2; i>=0; i--) {
-
-                // Insert the next layer from the front
-                MLPErr.insertElementAt(new Vector<>(),0);
-
-                // For every perceptron in this layer
-                for(int j=0; j<MLP.get(i).size(); j++) {
-
-                    // Calculate the totError
-                    double out = MLP.get(i).get(j).getOutput();
-                    double error = 0.0;
-
-                    // For every perceptron in the next layer
-                    for(int k=0; k<MLP.get(i+1).size(); k++) {
-
-                        // Add the weight of the input from the calculated perceptron
-                        // times the totError of this perceptron
-                        error+= MLP.get(i+1).get(k).getWeight(j+1) * MLPErr.get(1).get(k);
-
-                    }
-
-                    error *= out*(1-out);
-                    MLPErr.get(0).add(error);
-                }
-	    }
-	    // Update the weight of all perceptron from the front
-	    for(int i=0; i<MLP.size(); i++) {
-		for(int j=0; j<MLP.get(i).size(); j++) {
-		    MLP.get(i).get(j).learn(rate, MLPErr.get(i).get(j));
-		}
-	    }
-	}
-    }
+public class FFNNClassifier extends AbstractClassifier {
     
     /** The training data used by the classifier */
     private Instances trainingData;
     
-    /** The MLP-model used by rhis classifier */
+    /** The MLP-model used by this classifier */
     private MultiLayerPerceptron MLP;
     
     /** Learning paramater and stop condition */
-    private double learningRate = 0.1;
-    int maxEpoch = 10;
-    double target = 0.5;
+    private double learningRate = 0.01;
+    private int maxEpoch = 10000;
+    private double target = 0;
     
     /** The vector containing how many perceptron in each requested hidden layer */
-    Vector<Integer> perceptronCount = new Vector<>();
+    private Vector<Integer> perceptronCount = new Vector<>();
     
-    // ???
-    Vector<Vector<Double>> dataInput;
-    
-    
+
     /**
      * Generates a classifier. Must initialize all fields of the classifier that 
      * are not being set via options (ie. multiple calls of buildClassifier must 
      * always lead to the same result). Must not change the dataset in any way.
      *
-     * @param trainingData set of instances serving as training trainingData
+     * @param data set of instances serving as training trainingData
      * @exception Exception if the classifier has not been generated successfully
      */
     @Override
@@ -257,42 +61,49 @@ public class FFNNClassifier extends AbstractClassifier {
 	// Initialize the MLP-model
         MLP = new MultiLayerPerceptron(hiddenCount, perceptronCount);
 	
-	// hmm,.. redundan sih dataInput itu, nggak bisa diakses berdasarkan konteks juga
-        for (int i=0; i < inputCount; i++) {
-            dataInput.add(new Vector<>());
-        }	
-        for (int i = 0; i < trainingData.numInstances(); i++) {
-            Instance currData = trainingData.get(i);
-            for (int j = 0; j < inputCount; j++) {
-                dataInput.get(j).add(currData.value(j));
-            }
-        }
-	
+	// Loop to improve MLP model
 	int epoch = 0;
 	double epochError;
         do {
             epoch++;
+	    
+	    // For ever instance in the training data
             for (int i = 0; i < trainingData.numInstances(); i++) {
-                MLP.setInputs(dataInput.get(i));
+		
+		// Store every non-class attribute value as double of this instances to a vector
+		Vector<Double> in = new Vector<>(); 
+		Enumeration<Attribute> enumerateAttributes = trainingData.enumerateAttributes();
+		while(enumerateAttributes.hasMoreElements()) {
+		    in.add(trainingData.get(i).value(enumerateAttributes.nextElement()));
+		}
+		
+		// Propagate the input and learn based on the error value
+                MLP.setInputs(in);
                 MLP.frontPropragate();
-                MLP.backPropragate(learningRate, errorCount());
+                MLP.backPropragate(learningRate, errorCount(i));
+		
             }
             epochError = epochErrorCount();
         } while ((epochError >= target) && (epoch < maxEpoch));
+	int i =1;
     }
     
     /**
-     * Classifies the given test instance. The instance has to belong to a dataset
-     * when it's being classified. Note that a classifier MUST implement either
-     * this or distributionForInstance().
+     * Predicts the class memberships for a given instance. If an instance is 
+     * unclassified, the returned array elements must be all zero. If the class 
+     * is numeric, the array must consist of only one element, which contains 
+     * the predicted value. Note that a classifier MUST implement either this 
+     * or classifyInstance().
      *
      * @param instance the instance to be classified
-     * @return the predicted most likely class for the instance or
-     *         Utils.missingValue() if no prediction is made
-     * @throws Exception if an totError occurred during the prediction
+     * 
+     * @return an array containing the estimated membership probabilities of the 
+     * test instance in each class or the numeric prediction
+     * 
+     * @exception Exception if distribution could not be computed successfully
      */
     @Override
-    public double classifyInstance(Instance instance) throws Exception {
+    public double[] distributionForInstance(Instance instance) throws Exception {
 	
 	// Preprocess the instance 
 	Instances newInstances = new Instances(trainingData,0);
@@ -308,8 +119,9 @@ public class FFNNClassifier extends AbstractClassifier {
 	
 	// Propagate the input through the learned MLP-model
 	MLP.setInputs(in);
-	Vector<Double> frontPropragate = MLP.frontPropragate();
-	
+	MLP.frontPropragate();
+	Vector<Double> frontPropragate = MLP.getRawOutputs();
+		
 	// Search for the index of output perceptron with the highest value
 	double iMax = 0;
 	double vMax = 0;
@@ -320,32 +132,34 @@ public class FFNNClassifier extends AbstractClassifier {
 	    }
 	}
 	
-	return iMax;
+	double[] prob = new double[instance.classAttribute().numValues()];
+	for(int i=0; i<instance.classAttribute().numValues(); i++) {
+	    if (i == iMax) {
+		prob[i] = 1;
+	    } else {
+		prob[i] = 0;
+	    }
+	}
+	return prob;
     }
     
-    private Vector<Double> errorCount() {
+    private Vector<Double> errorCount(int instanceIndex) {
 	
 	// Fetch the output and maxOutput of the MLP 
         Vector<Double> output = MLP.getOutputs();
-        double max = output.get(0);
-        for (int i=1; i < output.size(); i++) {
-            if (max < output.get(i)) {
-                max = output.get(i);
-            }
-        }
+	double targetIdx = trainingData.get(instanceIndex).value(trainingData.classIndex());
 	
 	// NEED TO HANDLE IF ONLY ONE OUTPUT PERCEPTRON,
 	
-	// ... J, ini kamu tahu target-nya dari mana?..
         Vector<Double> errorClass = new Vector<>();
         for (int i=0; i < output.size(); i++) {
             double err;
-            if (max == output.get(i)) {
-                double outVal = output.get(i);
-                err = outVal * (1 - outVal) * (1 - outVal);
+	    double outVal = output.get(i);
+	    // outVal*(1-outVal)*
+            if (i == targetIdx) {
+                err = outVal*(1-outVal)*(1 - outVal);
             } else {
-                double outVal = output.get(i);
-                err = outVal * (1 - outVal) * (0 - outVal);
+                err = outVal*(1-outVal)*(0 - outVal);
             }
             errorClass.add(err);
         }
@@ -354,7 +168,7 @@ public class FFNNClassifier extends AbstractClassifier {
     }
     
     /**
-     * Count and return the sum of half-squared error the current MLP produce
+     * Count and return the sum of Mean absolute error the current MLP produce
      * for the training data
      */
     private double epochErrorCount() {
@@ -366,19 +180,40 @@ public class FFNNClassifier extends AbstractClassifier {
 	// For all instance in the traningData,
 	for (int i=0; i < trainingData.numInstances(); i++) {
 	    
+	    // Store every non-class attribute value as double of this instances to a vector
+	    Vector<Double> in = new Vector<>(); 
+	    Enumeration<Attribute> enumerateAttributes = trainingData.enumerateAttributes();
+	    while(enumerateAttributes.hasMoreElements()) {
+		in.add(trainingData.get(i).value(enumerateAttributes.nextElement()));
+	    }
+	    
 	    // Front propagate the value of this instance
-            MLP.setInputs(dataInput.get(i));
+            MLP.setInputs(in);
             MLP.frontPropragate();
 	    
-	    // Count the totError and add the ((error)^2)/2 of all error to the totError
-            errorClass = errorCount();
+	    // Count the error and add the absolute of all error to the totError
+            errorClass = errorCount(i);
             for (int j=0; j < errorClass.size(); j++) {
-                totError = totError + Math.pow(errorClass.get(j),2)/2;
+                totError = totError + Math.abs(errorClass.get(j));
             }
 	    
         }
 	
         return totError;
     }
-
+    
+    
+    public void setLearningRate(double rate) {
+	learningRate = rate;
+    }
+    public void setMaxEpoch (int max) {
+	maxEpoch = max;
+    }
+    public void setTarget (double t) {
+	target = t;
+    }
+    public void setPerceptronCount (Vector<Integer> pCount) {
+	perceptronCount = new Vector<>(pCount);
+    }
+    
 }

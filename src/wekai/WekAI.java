@@ -5,7 +5,9 @@
  */
 package wekai;
 
+import Classifier.FFNNClassifier;
 import Classifier.NaiveBayesClassifier;
+import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,10 +25,16 @@ public class WekAI {
 	try {
 	    
 	    WekaHandler w = new WekaHandler();
-	    w.readData("D:/mush.arff");
-	    NaiveBayesClassifier n = new NaiveBayesClassifier();
+	    //w.readData("D:/mush.arff");
+	    //w.readData("C:/Program Files/Weka-3-8/data/iris.arff");
+	    w.readData("D:/Team.arff");
+	    FFNNClassifier n = new FFNNClassifier();
+	    Vector<Integer> temp = new Vector<>();
+	    temp.add(2); temp.add(4);
+	    n.setPerceptronCount(temp);
+	    
 	    w.Model = n;
-	    w.tenFoldCrossValidation();
+	    w.fullTraining();
 	    
 	} catch (Exception ex) {
 	    Logger.getLogger(WekAI.class.getName()).log(Level.SEVERE, null, ex);
