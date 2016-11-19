@@ -6,6 +6,7 @@
 package Classifier;
 
 import java.io.Serializable;
+import static java.lang.Double.NaN;
 import java.util.Vector;
 
 /** A multi-layer perceptron container/helper class */
@@ -71,7 +72,7 @@ class MultiLayerPerceptron implements Serializable {
 	    //Looping neuron
 	    for (int j = 0; j < MLP.get(i).size(); j++){
 		double o = MLP.get(i).get(j).getOutput();
-
+		
 		for (int k = 0; k < MLP.get(i+1).size(); k++){
 		    MLP.get(i+1).get(k).setValue(j+1, o);
 		}

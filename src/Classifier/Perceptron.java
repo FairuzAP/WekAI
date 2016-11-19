@@ -6,6 +6,7 @@
 package Classifier;
 
 import java.io.Serializable;
+import static java.lang.Double.NaN;
 import java.util.Random;
 import java.util.Vector;
 

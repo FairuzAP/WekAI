@@ -6,6 +6,7 @@
 package Classifier;
 
 import java.io.Serializable;
+import static java.lang.Double.NaN;
 import java.util.Enumeration;
 import java.util.Random;
 import java.util.Scanner;
@@ -31,8 +32,8 @@ public class FFNNClassifier extends AbstractClassifier {
     private MultiLayerPerceptron MLP;
     
     /** Learning paramater and stop condition */
-    private double learningRate = 0.01;
-    private int maxEpoch = 10000;
+    private double learningRate = 0.3;
+    private int maxEpoch = 1000;
     private double target = 0;
     
     /** The vector containing how many perceptron in each requested hidden layer */
@@ -52,6 +53,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	
 	// Data initialization and reading
 	trainingData = new Instances(data);
+	trainingData.deleteWithMissingClass();
 	int hiddenCount = perceptronCount.size(); 
         int inputCount = trainingData.numAttributes() - 1;
 	perceptronCount.insertElementAt(inputCount, 0);
@@ -84,8 +86,8 @@ public class FFNNClassifier extends AbstractClassifier {
 		
             }
             epochError = epochErrorCount();
-        } while ((epochError >= target) && (epoch < maxEpoch));
-	int i =1;
+        } while ((epochError > target) && (epoch < maxEpoch));
+	int i = 1;
     }
     
     /**
@@ -196,7 +198,6 @@ public class FFNNClassifier extends AbstractClassifier {
             for (int j=0; j < errorClass.size(); j++) {
                 totError = totError + Math.abs(errorClass.get(j));
             }
-	    
         }
 	
         return totError;
