@@ -16,6 +16,7 @@ import weka.core.Instances;
 
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.Discretize;
+import weka.filters.unsupervised.attribute.Normalize;
 import weka.filters.unsupervised.instance.RemoveWithValues;
 
 
@@ -28,6 +29,9 @@ public class NaiveBayesClassifier extends AbstractClassifier {
     /** The discretize removeFilter used to discretize the test data */
     private Discretize discretizeFilter;
     
+    /** The normalize filter for the test data */
+    private Normalize normalFilter;
+
     /** The training data used by the classifier */
     private Instances trainingData;
 
@@ -61,7 +65,8 @@ public class NaiveBayesClassifier extends AbstractClassifier {
 	discretizeFilter.setAttributeIndices("first-last");
 	discretizeFilter.setBinRangePrecision(6);
 	discretizeFilter.setInputFormat(data);
-	trainingData = Filter.useFilter(data, discretizeFilter);
+
+        trainingData = Filter.useFilter(data, discretizeFilter);
 	
 	RemoveWithValues removeFilter = new RemoveWithValues();
 	removeFilter.setInvertSelection(true);
