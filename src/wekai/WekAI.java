@@ -30,7 +30,7 @@ public class WekAI {
 	    w.readData("D:/Team.arff");
 	    FFNNClassifier n = new FFNNClassifier();
 	    Vector<Integer> temp = new Vector<>();
-	    temp.add(20);temp.add(20);
+	    temp.add(12); 
 	    n.setPerceptronCount(temp);
 	    
 	    w.Model = n;

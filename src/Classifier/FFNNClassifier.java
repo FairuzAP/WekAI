@@ -17,6 +17,7 @@ import weka.core.Instance;
 import weka.core.Instances;
 
 import weka.filters.Filter;
+import weka.filters.unsupervised.attribute.Normalize;
 import weka.filters.unsupervised.instance.RemoveWithValues;
 
 /**
@@ -28,12 +29,14 @@ public class FFNNClassifier extends AbstractClassifier {
     /** The training data used by the classifier */
     private Instances trainingData;
     
+    Normalize normalFilter;
+    
     /** The MLP-model used by this classifier */
     private MultiLayerPerceptron MLP;
     
     /** Learning paramater and stop condition */
     private double learningRate = 0.3;
-    private int maxEpoch = 1000;
+    private int maxEpoch = 2000;
     private double target = 0;
     
     /** The vector containing how many perceptron in each requested hidden layer */
@@ -54,6 +57,13 @@ public class FFNNClassifier extends AbstractClassifier {
 	// Data initialization and reading
 	trainingData = new Instances(data);
 	trainingData.deleteWithMissingClass();
+	
+	normalFilter = new Normalize();
+	normalFilter.setScale(4);
+	normalFilter.setTranslation(-2);
+	normalFilter.setInputFormat(data);
+	trainingData = Filter.useFilter(data, normalFilter);
+	
 	int hiddenCount = perceptronCount.size(); 
         int inputCount = trainingData.numAttributes() - 1;
 	perceptronCount.insertElementAt(inputCount, 0);
@@ -111,6 +121,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	Instances newInstances = new Instances(trainingData,0);
 	newInstances.setClassIndex(trainingData.classIndex());
 	newInstances.add(instance);
+	newInstances = Filter.useFilter(newInstances, normalFilter);
 	
 	// Store every non-class attribute value as double of this instances to a vector
 	Vector<Double> in = new Vector<>(); 
