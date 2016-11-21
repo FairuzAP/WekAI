@@ -29,6 +29,7 @@ public class FFNNClassifier extends AbstractClassifier {
     /** The training data used by the classifier */
     private Instances trainingData;
     
+    /** Normalize Filter for FFNN*/
     Normalize normalFilter;
     
     /** The MLP-model used by this classifier */
@@ -55,7 +56,11 @@ public class FFNNClassifier extends AbstractClassifier {
     public void buildClassifier(Instances data) throws Exception {
 	
 	// Data initialization and reading
-	trainingData = new Instances(data);
+        normalFilter = new Normalize();
+	normalFilter.setScale(6);
+	normalFilter.setTranslation(-3);
+	normalFilter.setInputFormat(data);
+	trainingData = Filter.useFilter(data, normalFilter);
 	trainingData.deleteWithMissingClass();
 	
 	normalFilter = new Normalize();
@@ -133,7 +138,7 @@ public class FFNNClassifier extends AbstractClassifier {
 	// Propagate the input through the learned MLP-model
 	MLP.setInputs(in);
 	MLP.frontPropragate();
-	Vector<Double> frontPropragate = MLP.getRawOutputs();
+	Vector<Double> frontPropragate = MLP.getOutputs();
 		
 	// Search for the index of output perceptron with the highest value
 	double iMax = 0;
