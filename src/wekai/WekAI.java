@@ -40,7 +40,8 @@ public class WekAI {
             System.out.println("2. FFNN");
             int model = input.nextInt();
             if (model == 1) {
-                w.readData("D:/ProjectNow/AI/iris.arff");
+                w.readData("D:/ProjectNow/AI/Mush.arff");
+                w.Data.setClassIndex(0);
                 w.Model = nb;
             } else if (model == 2) {
                 w.readData("D:/ProjectNow/AI/Team.arff");

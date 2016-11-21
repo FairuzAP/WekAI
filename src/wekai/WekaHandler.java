@@ -54,6 +54,7 @@ public class WekaHandler {
 	try {
 	    Data = ConverterUtils.DataSource.read(filepath);
 	    Data.setClassIndex(Data.numAttributes()-1);
+//	    Data.setClassIndex(0);
 	    Result = new Instances(Data,0);
 	    Result.setClassIndex(Result.numAttributes()-1);
 	} catch (Exception ex) {
