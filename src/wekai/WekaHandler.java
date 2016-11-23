@@ -53,7 +53,8 @@ public class WekaHandler {
     public boolean readData(String filepath) {
 	try {
 	    Data = ConverterUtils.DataSource.read(filepath);
-	    Data.setClassIndex(Data.numAttributes()-1);
+	    Data.setClassIndex(27);
+//	    Data.setClassIndex(Data.numAttributes()-1);
 	    Result = new Instances(Data,0);
 	    Result.setClassIndex(Result.numAttributes()-1);
 	} catch (Exception ex) {
@@ -123,7 +124,7 @@ public class WekaHandler {
     public void setClassifier(Classifier d) {
 	Model = d;
     }
-	 
+
     /**
      * Learning dataset, 10-fold cross-validation; if no model is provided
      * then use NaiveBayes model by default
@@ -353,4 +354,51 @@ public class WekaHandler {
 	return true;
     }
     
+
+    /**
+     * Learning dataset, 10-fold cross-validation; if no model is provided
+     * then use NaiveBayes model by default
+     */
+    public void tenFoldCrossValidationTest(){
+	try {
+	    
+	    //Build classifier
+    	    long startTime = System.currentTimeMillis();
+	    long endTime   = System.currentTimeMillis();
+
+	    //Evaluate classifier
+	    int folds = 10;
+	    eval = new Evaluation(Data);
+	    eval.crossValidateModel(Model, Data, folds, new Random(1));
+
+	    //Print statistic result
+	    printResult(0,startTime,endTime,folds,0);
+	} catch(Exception ex) {
+	    System.out.println(ex);
+	}
+    }
+    /**
+     * Learning dataset, full-training; if no model is provided then use 
+     * NaiveBayes model by default
+     */
+    public void fullTrainingTest(){
+	try {
+	    
+	    //Train classifier
+	    long startTime = System.currentTimeMillis();
+	    long endTime   = System.currentTimeMillis();
+	    
+	    //Evaluate classifier
+	    eval = new Evaluation(Data);
+	    long startT = System.currentTimeMillis();
+	    eval.evaluateModel(Model, Data);
+	    long endT   = System.currentTimeMillis();
+	    
+	    //Print statistics
+	    printResult(1,startTime,endTime,startT,endT);
+	    
+	} catch(Exception ex) {
+	    System.out.println(ex);
+	}
+    }
 }

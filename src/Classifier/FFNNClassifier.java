@@ -18,6 +18,7 @@ import weka.core.Instances;
 
 import weka.filters.Filter;
 import weka.filters.unsupervised.attribute.Normalize;
+import weka.filters.unsupervised.attribute.Remove;
 import weka.filters.unsupervised.instance.RemoveWithValues;
 
 /**
@@ -55,20 +56,20 @@ public class FFNNClassifier extends AbstractClassifier {
     @Override
     public void buildClassifier(Instances data) throws Exception {
 	
+	/** Remove unwanted class attr */
+	Remove removeFilter = new Remove();
+	removeFilter.setAttributeIndices("27");
+	removeFilter.setInputFormat(data);
+	Instances tempData = Filter.useFilter(data, removeFilter);
+
 	// Data initialization and reading
         normalFilter = new Normalize();
 	normalFilter.setScale(6);
 	normalFilter.setTranslation(-3);
-	normalFilter.setInputFormat(data);
-	trainingData = Filter.useFilter(data, normalFilter);
+	normalFilter.setInputFormat(tempData);
+	trainingData = Filter.useFilter(tempData, normalFilter);
 	trainingData.deleteWithMissingClass();
-	
-	normalFilter = new Normalize();
-	normalFilter.setScale(4);
-	normalFilter.setTranslation(-2);
-	normalFilter.setInputFormat(data);
-	trainingData = Filter.useFilter(data, normalFilter);
-	
+		
 	int hiddenCount = perceptronCount.size(); 
         int inputCount = trainingData.numAttributes() - 1;
 	perceptronCount.insertElementAt(inputCount, 0);
