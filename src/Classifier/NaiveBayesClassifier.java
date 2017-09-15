@@ -62,18 +62,18 @@ public class NaiveBayesClassifier extends AbstractClassifier {
 	data.deleteWithMissingClass();
 	
 	/** Remove unwanted class attr */
-	Remove remove = new Remove();
-	remove.setAttributeIndices("28");
-	remove.setInputFormat(data);
-	Instances tempData = Filter.useFilter(data, remove);
+//	Remove remove = new Remove();
+//	remove.setAttributeIndices("28");
+//	remove.setInputFormat(data);
+//	Instances tempData = Filter.useFilter(data, remove);
 
 	// Discretize all the data attribute 
 	discretizeFilter = new Discretize();
 	discretizeFilter.setAttributeIndices("first-last");
 	discretizeFilter.setBinRangePrecision(6);
-	discretizeFilter.setInputFormat(tempData);
+	discretizeFilter.setInputFormat(data);
 
-        trainingData = Filter.useFilter(tempData, discretizeFilter);
+        trainingData = Filter.useFilter(data, discretizeFilter);
 
 	RemoveWithValues removeFilter = new RemoveWithValues();
 	removeFilter.setInvertSelection(true);

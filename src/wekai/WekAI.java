@@ -5,14 +5,10 @@
  */
 package wekai;
 
-import Classifier.FFNNClassifier;
-import Classifier.NaiveBayesClassifier;
-import java.util.Scanner;
-import java.util.Vector;
+import weka.classifiers.trees.J48;
+import Classifier.Tree.ID3Classifier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import weka.filters.unsupervised.attribute.Remove;
-
 /**
  *
  * @author USER
@@ -27,11 +23,20 @@ public class WekAI {
 	try {
 	    
 	    WekaHandler w = new WekaHandler();
-	    //w.readData("D:/mush.arff");
-	    //w.re+adData("C:/Program Files/Weka-3-8/data/iris.arff");
-	    FFNNClassifier n = new FFNNClassifier();
-            NaiveBayesClassifier nb = new NaiveBayesClassifier();
-	    Vector<Integer> temp = new Vector<>();
+	    w.readData("C:/Program Files/Weka-3-8/data/vote.arff");
+	    ID3Classifier id3 = new ID3Classifier();
+	    J48 j = new J48();
+	    
+	    w.Model = id3;
+	    w.fullTraining();
+
+	} catch (Exception ex) {
+	    Logger.getLogger(WekAI.class.getName()).log(Level.SEVERE, null, ex);
+	}
+	
+    }
+    
+}
 
 /*
             Scanner input = new Scanner(System.in);
@@ -87,17 +92,6 @@ public class WekAI {
             }
 	    w.saveModel("D:/Team-test.model");
 */
-	    //Train and save model student-train FFNN
-	    w.readData("D:/student-train.arff");
-	    w.Model = n;
-	    temp.add(32);
-	    n.setPerceptronCount(temp);
-	    n.setMaxEpoch(2000);
-	    n.setLearningRate(0.1);
-	    n.setTarget(0);
-	    w.fullTraining();
-	    w.saveModel("D:/std2.model");
-	    
 	    //Train and save model student-train NB
 //	    w.readData("D:/student-train.arff");
 //	    w.Model = nb;
@@ -113,11 +107,3 @@ public class WekAI {
 //	    w.readData("D:/student-mat-test.arff");
 //	    w.readModel("D:/std.model");
 //	    w.fullTrainingTest();
-
-	} catch (Exception ex) {
-	    Logger.getLogger(WekAI.class.getName()).log(Level.SEVERE, null, ex);
-	}
-	
-    }
-    
-}

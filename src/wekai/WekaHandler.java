@@ -9,6 +9,8 @@ import java.text.ParseException;
 import java.util.Enumeration;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import weka.classifiers.Classifier;
 import weka.classifiers.Evaluation;
 import weka.classifiers.bayes.NaiveBayes;
@@ -53,8 +55,7 @@ public class WekaHandler {
     public boolean readData(String filepath) {
 	try {
 	    Data = ConverterUtils.DataSource.read(filepath);
-	    Data.setClassIndex(27);
-//	    Data.setClassIndex(Data.numAttributes()-1);
+	    Data.setClassIndex(Data.numAttributes()-1);
 	    Result = new Instances(Data,0);
 	    Result.setClassIndex(Result.numAttributes()-1);
 	} catch (Exception ex) {
@@ -172,7 +173,7 @@ public class WekaHandler {
 	    printResult(1,startTime,endTime,startT,endT);
 	    
 	} catch(Exception ex) {
-	    System.out.println(ex);
+	    Logger.getLogger(WekaHandler.class.getName()).log(Level.SEVERE, null, ex);
 	}
     }
     
