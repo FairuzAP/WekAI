@@ -9,12 +9,10 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import weka.classifiers.AbstractClassifier;
 import weka.core.Attribute;
-import weka.core.AttributeStats;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.Discretize;
-import weka.filters.unsupervised.instance.RemoveWithValues;
 
 /**
  *
@@ -77,42 +75,40 @@ public class ID3Classifier extends AbstractClassifier {
     
     protected final double countNominalInformationGain(Instances nodeData, int attID) throws Exception {
 	Instances data = new Instances(nodeData);
+	Attribute att = data.attribute(attID);
+	Attribute classAtt = data.classAttribute();
 	data.deleteWithMissing(attID);
 	
-	RemoveWithValues removeFilter = new RemoveWithValues();
-	removeFilter.setInvertSelection(true);
-	removeFilter.setMatchMissingValues(false);
-	removeFilter.setAttributeIndex("" + (attID+1));
+	int[] classCount = new int[classAtt.numValues()];
+	int[][] attClassCount = new int[classAtt.numValues()][att.numValues()];
+	int[] attCount = new int[att.numValues()];
+	
+	Enumeration<Instance> instances = data.enumerateInstances();
+	while(instances.hasMoreElements()) {
+	    Instance instance = instances.nextElement();
+	    classCount[(int)instance.classValue()] += 1;
+	    attClassCount[(int)instance.classValue()][(int)instance.value(attID)] += 1;
+	    attCount[(int)instance.value(attID)] += 1;
+	}
 	
 	double result = 0;
-	AttributeStats classStat = data.attributeStats(data.classIndex());
-	for(int i=0; i<classStat.nominalCounts.length; i++) {
-	    double prob = (double)classStat.nominalCounts[i] / (double)classStat.totalCount;
+	
+	for(int i=0; i<classCount.length; i++) {
+	    double prob = (double)classCount[i] / (double)data.size();
 	    if(prob > 0) {
 		result -= prob * (Math.log10(prob) / Math.log10(2));
 	    }
 	}
 	
-	Attribute att = data.attribute(attID);
-	AttributeStats attStat = data.attributeStats(attID);
-	Enumeration<Object> values = att.enumerateValues();
-	
-	while(values.hasMoreElements()) {
-	    String nextVal = values.nextElement().toString();
-	    int valID = att.indexOfValue(nextVal);
-	    removeFilter.setNominalIndices("" + (valID+1));
-	    removeFilter.setInputFormat(data);
-	    Instances subDataAttValue = Filter.useFilter(data, removeFilter);
-	    
-	    AttributeStats subClassStat = subDataAttValue.attributeStats(subDataAttValue.classIndex());
-	    double temp = 0;
-	    for(int i=0; i<subClassStat.nominalCounts.length; i++) {
-		double prob = (double)subClassStat.nominalCounts[i] / (double)subClassStat.totalCount;
+	for(int i=0; i<attCount.length; i++) {
+	    for(int j=0; j<attClassCount.length; j++) {
+		double temp = 0;
+		double prob = (double)attClassCount[j][i] / (double)attCount[i];
 		if(prob > 0) {
 		    temp -= prob * (Math.log10(prob) / Math.log10(2));
 		}
+		result -= ((double)attCount[i] / (double)data.size()) * temp;
 	    }
-	    result -= ((double)attStat.nominalCounts[valID] / (double)data.numInstances()) * temp;
 	}
 	
 	return result;
