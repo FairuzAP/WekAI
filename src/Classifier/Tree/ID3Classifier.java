@@ -42,13 +42,14 @@ public class ID3Classifier extends AbstractClassifier {
         trainingData = Filter.useFilter(data, discretizeFilter);
 	root = new ID3DecisionTree(null, trainingData);
 	setupTree(root);
+	System.out.println(root);
     }
     
     protected void setupTree(ID3DecisionTree node) throws Exception {
 	Instances data = node.getNodeData();
 	if(!data.isEmpty()) {
 	    int bestAttributeID = -1;
-	    double bestInformationGain = -1;
+	    double bestInformationGain = 0;
 	    
 	    for(int i=0; i<data.numAttributes(); i++) {
 		if(i != data.classIndex()) {

@@ -6,9 +6,12 @@
 package Classifier.Tree;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -148,5 +151,40 @@ public class ID3DecisionTree {
     public final boolean isLeaf() {
 	return isLeaf;
     }
-
+    
+    @Override
+    public String toString() {
+	try {
+	    return toString(0);
+	} catch (Exception ex) {
+	    Logger.getLogger(ID3DecisionTree.class.getName()).log(Level.SEVERE, null, ex);
+	    return "";
+	}
+    }
+    
+    public String toString(int level) throws Exception {
+	StringBuilder sb = new StringBuilder();
+	if(!isLeaf()) {
+	    sb.append(tabLevel(level));
+	    sb.append(String.format("Separator = %s\n", nodeTrainingData.attribute(splitterAttributeID)));
+	    for(Map.Entry<String, Integer> entry : nominalSplitter.entrySet()) {
+		sb.append(tabLevel(level));
+		sb.append(String.format("Case %s,\n", entry.getKey()));
+		sb.append(subTrees.get(entry.getValue()).toString(level + 1));
+	    }
+	} else {
+	    sb.append(tabLevel(level));
+	    sb.append("Leaf Node: ");
+	    sb.append(Arrays.toString(getClassDistribution()));
+	    sb.append("\n");
+	}
+	return sb.toString();
+    }
+    private String tabLevel(int level) {
+	StringBuilder sb = new StringBuilder();
+	for(int i=0; i<level; i++) {
+	    sb.append("   ");
+	}
+	return sb.toString();
+    }
 }

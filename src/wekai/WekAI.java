@@ -23,7 +23,7 @@ public class WekAI {
 	try {
 	    
 	    WekaHandler w = new WekaHandler();
-	    w.readData("C:/Program Files/Weka-3-8/data/soybean.arff");
+	    w.readData("C:/Program Files/Weka-3-8/data/contact-lenses.arff");
 	    ID3Classifier id3 = new ID3Classifier();
 	    J48 j = new J48();
 	    
