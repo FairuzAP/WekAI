@@ -5,6 +5,8 @@
  */
 package Classifier.Tree;
 
+import java.util.Enumeration;
+import java.util.TreeMap;
 import weka.core.Instance;
 import weka.core.Instances;
 
@@ -13,19 +15,39 @@ import weka.core.Instances;
  * @author USER
  */
 public class C45DecisionTree extends ID3DecisionTree {
-
+    
     public C45DecisionTree(ID3DecisionTree parentNode, Instances subData) {
 	super(parentNode, subData);
     }
     
-    @Override
-    public void SetNominalSplitter(int attID) throws Exception {
-	super.SetNominalSplitter(attID);
+    /**
+     * Will setup the splitterAttribute and initialize the subtree of this node 
+     * by using the attID as the splitterAttribute attribute
+     * @param attID The attribute ID this node will use to split the data
+     * @throws java.lang.Exception
+     */
+    public final void SetNumericSplitter(int attID) throws Exception {
+	splitterMap.clear();
+	subTrees.clear();
+	
+	isLeaf = false;
+	splitterAttribute = nodeTrainingData.attribute(attID);;
+
+	// TODO: Here
+	
+	setupSubTrees();
     }
+    
     
     @Override
     protected void setupSubTrees() throws Exception {
-	super.setupSubTrees();
+	if(splitterAttribute.isNominal()) {
+	    super.setupSubTrees();
+	} else {
+	    
+	    // TODO: Here
+	    
+	}
     }
     
     /**

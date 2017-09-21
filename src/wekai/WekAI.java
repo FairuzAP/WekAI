@@ -23,12 +23,12 @@ public class WekAI {
 	try {
 	    
 	    WekaHandler w = new WekaHandler();
-	    w.readData("C:/Program Files/Weka-3-8/data/contact-lenses.arff");
+	    w.readTrainingData("C:/Program Files/Weka-3-8/data/vote.arff");
 	    ID3Classifier id3 = new ID3Classifier();
 	    J48 j = new J48();
 	    
 	    w.Model = id3;
-	    w.fullTraining();
+	    w.fullTraining(true);
 
 	} catch (Exception ex) {
 	    Logger.getLogger(WekAI.class.getName()).log(Level.SEVERE, null, ex);
@@ -47,10 +47,10 @@ public class WekAI {
             System.out.println("3. Baca model faiz.model");
             int model = input.nextInt();
             if (model == 1) {
-		w.readData("D:/iris.arff");
+		w.readTrainingData("D:/iris.arff");
                 w.Model = nb;
             } else if (model == 2) {
-                w.readData("D:/Team.arff");
+                w.readTrainingData("D:/Team.arff");
                 w.Model = n;
                 System.out.println("Input perceptron number in hidden layer (0 for no hidden layer) : ");
                 int models = input.nextInt();
@@ -59,7 +59,7 @@ public class WekAI {
                 }
                 n.setPerceptronCount(temp);
             } else if (model == 3) {
-                w.readData("D:/iris.arff");
+                w.readTrainingData("D:/iris.arff");
 		w.readModel("D:/faiz.model");
             } else {
                 System.out.println("input salah");
@@ -85,7 +85,7 @@ public class WekAI {
                     n.setTarget(0);
                 }
 		w.randomize();
-                w.tenFoldCrossValidation();
+                w.tenFoldCrossTraining();
             } else {
                 System.out.println("input salah");
                 System.exit(0);
@@ -93,17 +93,17 @@ public class WekAI {
 	    w.saveModel("D:/Team-test.model");
 */
 	    //Train and save model student-train NB
-//	    w.readData("D:/student-train.arff");
+//	    w.readTrainingData("D:/student-train.arff");
 //	    w.Model = nb;
 //	    w.fullTraining();
 //	    w.saveModel("D:/std.model");
 //	    
 	    //Student-mat-test FFNN
-//	    w.readData("D:/student-mat-test.arff");
+//	    w.readTrainingData("D:/student-mat-test.arff");
 //	    w.readModel("D:/std2.model");
-//	    w.fullTrainingTest();
+//	    w.fullValidation();
 
 	    //Student-mat-test NB
-//	    w.readData("D:/student-mat-test.arff");
+//	    w.readTrainingData("D:/student-mat-test.arff");
 //	    w.readModel("D:/std.model");
-//	    w.fullTrainingTest();
+//	    w.fullValidation();

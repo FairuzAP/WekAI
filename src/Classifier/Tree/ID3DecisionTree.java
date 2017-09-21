@@ -13,6 +13,7 @@ import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import weka.core.Attribute;
+import weka.core.AttributeStats;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.filters.Filter;
@@ -33,40 +34,39 @@ public class ID3DecisionTree {
     protected ArrayList<ID3DecisionTree> subTrees;
     
     /** The attribute ID used to separate the data at this node */
-    protected int splitterAttributeID;
-    protected TreeMap<String, Integer> nominalSplitter;
+    protected Attribute splitterAttribute;
+    protected TreeMap<Double, Integer> splitterMap;
     
     
     /** Make a new tree node with the supplied training data */
     public ID3DecisionTree(ID3DecisionTree parentNode, Instances subData) {
 	isLeaf = true;
-	splitterAttributeID = -1;
+	splitterAttribute = null;
 	nodeTrainingData = subData;
-	nominalSplitter = new TreeMap<>();
+	splitterMap = new TreeMap<>();
 	subTrees = new ArrayList<>();
 	parent = parentNode;
     }
     
     /**
-     * Will setup the splitter and initialize the subtree of this node by using
-     * the attID as the splitter attribute
+     * Will setup the splitterAttribute and initialize the subtree of this node 
+     * by using the attID as the splitterAttribute attribute
      * @param attID The attribute ID this node will use to split the data
      * @throws java.lang.Exception
      */
-    public void SetNominalSplitter(int attID) throws Exception {
-	nominalSplitter.clear();
+    public final void SetNominalSplitter(int attID) throws Exception {
+	splitterMap.clear();
 	subTrees.clear();
 	
 	isLeaf = false;
-	Attribute splitter = nodeTrainingData.attribute(attID);
-	splitterAttributeID = attID;
+	splitterAttribute = nodeTrainingData.attribute(attID);;
 
-	Enumeration<Object> values = splitter.enumerateValues();
+	Enumeration<Object> values = splitterAttribute.enumerateValues();
 	int i = 0;
 
 	while(values.hasMoreElements()) {
 	    String value = values.nextElement().toString();
-	    nominalSplitter.put(value, i);
+	    splitterMap.put((double)splitterAttribute.indexOfValue(value), i);
 	    subTrees.add(null);
 	    i++;
 	}
@@ -75,20 +75,20 @@ public class ID3DecisionTree {
     }
     
     /**
-     * Will initialize the subtree according to the splitter
+     * Will initialize the subtree according to the splitterAttribute
      * @throws Exception
      */
     protected void setupSubTrees() throws Exception {
 	RemoveWithValues removeFilter = new RemoveWithValues();
 	removeFilter.setInvertSelection(true);
 	
-	for(Map.Entry<String, Integer> entry : nominalSplitter.entrySet()) {
-	    removeFilter.setAttributeIndex("" + (splitterAttributeID+1));
-	    removeFilter.setNominalIndices("" + (nodeTrainingData.attribute(splitterAttributeID).indexOfValue(entry.getKey())+1));
+	for(Map.Entry<Double, Integer> entry : splitterMap.entrySet()) {
+	    removeFilter.setAttributeIndex("" + (splitterAttribute.index()+1));
+	    removeFilter.setNominalIndices("" + (entry.getKey().intValue()+1));
 	    removeFilter.setInputFormat(nodeTrainingData);
 
 	    Instances subData = Filter.useFilter(nodeTrainingData, removeFilter);
-	    subData.deleteAttributeAt(splitterAttributeID);
+	    subData.deleteAttributeAt(splitterAttribute.index());
 	    subTrees.set(entry.getValue(), new ID3DecisionTree(this, subData));	    
 	}
     }
@@ -107,16 +107,15 @@ public class ID3DecisionTree {
      */
     public double[] getSubTreeDistribution(Instance data) {
 	double[] res = new double[subTrees.size()];
-	if(splitterAttributeID != -1) {
-	    Attribute splitterAttribute = nodeTrainingData.attribute(splitterAttributeID);
+	if(splitterAttribute != null) {
 	    Enumeration<Attribute> attributes = data.enumerateAttributes();
 	    
 	    while(attributes.hasMoreElements()) {
 		Attribute nextAttributes = attributes.nextElement();
-		if(nextAttributes.name() == null ? splitterAttribute.name() == null : nextAttributes.name().equals(splitterAttribute.name())) {
+		if(nextAttributes.name().equals(splitterAttribute.name())) {
 		    if(!data.isMissing(nextAttributes)) {
 			String val = data.stringValue(nextAttributes); 
-			res[nominalSplitter.get(val)] = 1.0;
+			res[splitterMap.get((double)splitterAttribute.indexOfValue(val))] = 1.0;
 		    }
 		}
 	    }
@@ -166,10 +165,10 @@ public class ID3DecisionTree {
 	StringBuilder sb = new StringBuilder();
 	if(!isLeaf()) {
 	    sb.append(tabLevel(level));
-	    sb.append(String.format("Separator = %s\n", nodeTrainingData.attribute(splitterAttributeID)));
-	    for(Map.Entry<String, Integer> entry : nominalSplitter.entrySet()) {
+	    sb.append(String.format("Separator = %s\n", nodeTrainingData.attribute(splitterAttribute.index())));
+	    for(Map.Entry<Double, Integer> entry : splitterMap.entrySet()) {
 		sb.append(tabLevel(level));
-		sb.append(String.format("Case %s,\n", entry.getKey()));
+		sb.append(String.format("Case %s,\n", nodeTrainingData.attribute(splitterAttribute.index()).value(entry.getKey().intValue())));
 		sb.append(subTrees.get(entry.getValue()).toString(level + 1));
 	    }
 	} else {
@@ -180,7 +179,7 @@ public class ID3DecisionTree {
 	}
 	return sb.toString();
     }
-    private String tabLevel(int level) {
+    protected static final String tabLevel(int level) {
 	StringBuilder sb = new StringBuilder();
 	for(int i=0; i<level; i++) {
 	    sb.append("   ");

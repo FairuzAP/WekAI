@@ -21,8 +21,7 @@ import weka.core.Instances;
 import weka.core.SerializationHelper;
 import weka.core.converters.ConverterUtils;
 import weka.filters.Filter;
-import weka.filters.unsupervised.attribute.Discretize;
-import weka.filters.unsupervised.attribute.NumericToNominal;
+import weka.filters.unsupervised.instance.Resample;
 
 /**
  *
@@ -33,7 +32,12 @@ public class WekaHandler {
     /**
      * The training data 
      */
-    public Instances Data;
+    public Instances TrainingData;
+    /**
+     * The validation data 
+     */
+    public Instances ValidationData;
+    
     /**
      * The most recent trained / untrained Classifier for this data
      */
@@ -41,23 +45,26 @@ public class WekaHandler {
     /**
      * The most recent evaluation of a training
      */
-    public Evaluation eval;
+    private Evaluation eval;
+    
     /**
      * The classified from training data 
      */
-    public Instances Result;
+    private Instances UnclassifiedData;
     
     /**
      * Load data from the usual file type
      * @param filepath the file path of the loaded file
      * @return TRUE if data was read succesfully, FALSE if otherwise
      */
-    public boolean readData(String filepath) {
+    public boolean readTrainingData(String filepath) {
 	try {
-	    Data = ConverterUtils.DataSource.read(filepath);
-	    Data.setClassIndex(Data.numAttributes()-1);
-	    Result = new Instances(Data,0);
-	    Result.setClassIndex(Result.numAttributes()-1);
+	    TrainingData = ConverterUtils.DataSource.read(filepath);
+	    TrainingData.setClassIndex(TrainingData.numAttributes()-1);
+	    ValidationData = TrainingData;
+	    
+	    UnclassifiedData = new Instances(TrainingData,0);
+	    UnclassifiedData.setClassIndex(UnclassifiedData.numAttributes()-1);
 	} catch (Exception ex) {
 	    System.out.println(ex);
 	    return false;
@@ -69,47 +76,20 @@ public class WekaHandler {
      * Shuffle the order of the data
      */
     public void randomize() {
-	Random RNGesus = Data.getRandomNumberGenerator(System.currentTimeMillis());
-	Data.randomize(RNGesus);
-    }
-    
-    
-    /**
-     * Discretize data according to the parameters
-     * @param attributes The id's of the attributes to be discretized, 
-     * @param binnumber the desired number of bins
-     * @param intervalweight the desired weight of instances per interval
-     * @return true if all goes well
-     */
-    public boolean discretize(int[] attributes, int binnumber, int intervalweight) {
-	Discretize d = new Discretize();
-	d.setAttributeIndicesArray(attributes);
-	d.setBins(binnumber);
-	d.setDesiredWeightOfInstancesPerInterval(intervalweight);
-	return filterize(d);
-    }
-    /**
-     * Convert the attributes in Data from numeric to nominal
-     * @param attributes The id's of the attributes to be converted to nominal,
-     * if NULL all will be discretized
-     * @return true if all goes well
-     */
-    public boolean numericToNominal(int[] attributes) {
-	NumericToNominal n = new NumericToNominal();
-	n.setAttributeIndicesArray(attributes);
-	return filterize(n);
+	Random RNGesus = TrainingData.getRandomNumberGenerator(System.currentTimeMillis());
+	TrainingData.randomize(RNGesus);
     }
     
     /**
-     * Apply a filter to the Data
+     * Apply a filter to the TrainingData
      * @param f The filter to be applied
      * @return true if all goes well
      */
     public boolean filterize(Filter f) {
 	try {
-	    f.setInputFormat(Data);
-	    Instances newData = Filter.useFilter(Data, f);
-	    Data = newData;
+	    f.setInputFormat(TrainingData);
+	    Instances newData = Filter.useFilter(TrainingData, f);
+	    TrainingData = newData;
 	} catch (Exception ex) {
 		
 	    return false;
@@ -129,23 +109,26 @@ public class WekaHandler {
     /**
      * Learning dataset, 10-fold cross-validation; if no model is provided
      * then use NaiveBayes model by default
+     * @param train Whether or not to build the classifier, or just validate it
      */
-    public void tenFoldCrossValidation(){
+    public void tenFoldCrossTraining(boolean train){
 	try {
 	    
 	    //Build classifier
 	    if(Model==null) Model = new NaiveBayes();
     	    long startTime = System.currentTimeMillis();
-	    Model.buildClassifier(Data);
+	    if(train) {
+		Model.buildClassifier(TrainingData);
+	    }
 	    long endTime   = System.currentTimeMillis();
 
 	    //Evaluate classifier
 	    int folds = 10;
-	    eval = new Evaluation(Data);
-	    eval.crossValidateModel(Model, Data, folds, new Random(1));
+	    eval = new Evaluation(TrainingData);
+	    eval.crossValidateModel(Model, ValidationData, folds, new Random(1));
 
 	    //Print statistic result
-	    printResult(0,startTime,endTime,folds,0);
+	    printResult(startTime,endTime);
 	} catch(Exception ex) {
 	    System.out.println(ex);
 	}
@@ -153,24 +136,25 @@ public class WekaHandler {
     /**
      * Learning dataset, full-training; if no model is provided then use 
      * NaiveBayes model by default
+     * @param train Whether or not to build the classifier, or just validate it
      */
-    public void fullTraining(){
+    public void fullTraining(boolean train){
 	try {
 	    
 	    //Train classifier
 	    if(Model==null) Model = new NaiveBayes();
 	    long startTime = System.currentTimeMillis();
-	    Model.buildClassifier(Data);
+	    if(train) {
+		Model.buildClassifier(TrainingData);
+	    }
 	    long endTime   = System.currentTimeMillis();
 	    
 	    //Evaluate classifier
-	    eval = new Evaluation(Data);
-	    long startT = System.currentTimeMillis();
-	    eval.evaluateModel(Model, Data);
-	    long endT   = System.currentTimeMillis();
+	    eval = new Evaluation(TrainingData);
+	    eval.evaluateModel(Model, ValidationData);
 	    
 	    //Print statistics
-	    printResult(1,startTime,endTime,startT,endT);
+	    printResult(startTime,endTime);
 	    
 	} catch(Exception ex) {
 	    Logger.getLogger(WekaHandler.class.getName()).log(Level.SEVERE, null, ex);
@@ -186,37 +170,23 @@ public class WekaHandler {
      * @param prop1 another properties from each scheme
      * @param prop2 another properties from each scheme
      */
-    public void printResult(int scheme,long startTime,long endTime,long prop1,long prop2) {
+    public void printResult(long startTime,long endTime) {
 	try {
 	    // Print result
 	    System.out.println("=== Run information ===\n");
 	    System.out.println("Scheme:       " + Model.getClass().getName());
-	    System.out.println("Relation:     " + Data.relationName());
-	    System.out.println("Instances:    " + Data.numInstances());
-	    System.out.println("Attributes:   " + Data.numAttributes());
-	    for(int i=0;i<Data.numAttributes();i++){
-		System.out.println("              " + Data.attribute(i).name());
-	    }
-	    
-	    if (scheme==0){
-		System.out.println("Test mode:    "+ prop1 +"-fold cross-validation");
-	    }else{
-		System.out.println("Test mode:    evaluate on training data");
+	    System.out.println("Relation:     " + TrainingData.relationName());
+	    System.out.println("Instances:    " + TrainingData.numInstances());
+	    System.out.println("Attributes:   " + TrainingData.numAttributes());
+	    for(int i=0;i<TrainingData.numAttributes();i++){
+		System.out.println("              " + TrainingData.attribute(i).name());
 	    }
 
 	    System.out.println("\n=== Classifier model (full training set) ===\n");
 	    System.out.println(Model.toString());
-
 	    System.out.println("\nTime taken to build model: " + String.format("%.2f",(endTime-startTime)/1000.0) + " seconds\n");
 
-	    if (scheme==0){
-		System.out.println("=== Stratified cross-validation ===");
-	    }else{
-		System.out.println("=== Evaluation on training set ===\n");
-		System.out.println("Time taken to test model on training data: "+ String.format("%.2f",(prop2-prop1)/1000.0) +" seconds\n");
-	    }
-
-	    System.out.println(eval.toSummaryString("=== Summary ===\n",false));
+	    System.out.println(eval.toSummaryString("=== Evaluation Summary ===\n",false));
 	    System.out.println(eval.toClassDetailsString());
 	    System.out.println(eval.toMatrixString());
 	}catch (Exception ex){
@@ -226,17 +196,17 @@ public class WekaHandler {
     }
     public void printEvalResult() {
 	try {
-	    eval = new Evaluation(Data);
-	    eval.evaluateModel(Model, Data);
+	    eval = new Evaluation(TrainingData);
+	    eval.evaluateModel(Model, TrainingData);
 	    
 	    // Print result
 	    System.out.println("=== Run information ===\n");
 	    System.out.println("Scheme:       " + Model.getClass().getName());
-	    System.out.println("Relation:     " + Data.relationName());
-	    System.out.println("Instances:    " + Data.numInstances());
-	    System.out.println("Attributes:   " + Data.numAttributes());
-	    for(int i=0;i<Data.numAttributes();i++){
-		System.out.println("              " + Data.attribute(i).name());
+	    System.out.println("Relation:     " + TrainingData.relationName());
+	    System.out.println("Instances:    " + TrainingData.numInstances());
+	    System.out.println("Attributes:   " + TrainingData.numAttributes());
+	    for(int i=0;i<TrainingData.numAttributes();i++){
+		System.out.println("              " + TrainingData.attribute(i).name());
 	    }
 
 	    System.out.println("\n=== Classifier model (full training set) ===\n");
@@ -275,17 +245,17 @@ public class WekaHandler {
     
     
     /**
-     * Create an instance of the 'Data' Instances from cmd input's and append 
-     * it to Result's instances
+     * Create an instance of the 'TrainingData' Instances from cmd input's and 
+ append it to UnclassifiedData's instances
      * @throws java.lang.Exception if an unrecognized input is read
      */
     public void getInstance() throws Exception {
 	
-	double values[] = new double[Data.numAttributes()];
+	double values[] = new double[TrainingData.numAttributes()];
 	Scanner in = new Scanner(System.in);
-	for(int i=0; i < Data.numAttributes()-1; i++) {
+	for(int i=0; i < TrainingData.numAttributes()-1; i++) {
 	    
-	    Attribute att = Data.attribute(i);
+	    Attribute att = TrainingData.attribute(i);
 	    String attype = Attribute.typeToString(att);
 	    System.out.format("Please give '%s' %s attribute value\n", att.name(), attype);
 	    
@@ -304,7 +274,7 @@ public class WekaHandler {
 	}
 	
 	Instance res = new DenseInstance(1.0,values);
-	Result.add(res);
+	UnclassifiedData.add(res);
     }
     private double parseAttInput(Attribute att, String input) throws Exception {
 	String attype = Attribute.typeToString(att);
@@ -344,62 +314,14 @@ public class WekaHandler {
     public boolean classifyInstance() {
 	try {
 	    
-	    for (int i = 0; i < Result.numInstances(); i++) {
-		double clsLabel = Model.classifyInstance(Result.instance(i));
-		Result.instance(i).setClassValue(clsLabel);
+	    for (int i = 0; i < UnclassifiedData.numInstances(); i++) {
+		double clsLabel = Model.classifyInstance(UnclassifiedData.instance(i));
+		UnclassifiedData.instance(i).setClassValue(clsLabel);
 	    }
 	    
 	} catch (Exception ex) {
 	    return false;
 	}
 	return true;
-    }
-    
-
-    /**
-     * Learning dataset, 10-fold cross-validation; if no model is provided
-     * then use NaiveBayes model by default
-     */
-    public void tenFoldCrossValidationTest(){
-	try {
-	    
-	    //Build classifier
-    	    long startTime = System.currentTimeMillis();
-	    long endTime   = System.currentTimeMillis();
-
-	    //Evaluate classifier
-	    int folds = 10;
-	    eval = new Evaluation(Data);
-	    eval.crossValidateModel(Model, Data, folds, new Random(1));
-
-	    //Print statistic result
-	    printResult(0,startTime,endTime,folds,0);
-	} catch(Exception ex) {
-	    System.out.println(ex);
-	}
-    }
-    /**
-     * Learning dataset, full-training; if no model is provided then use 
-     * NaiveBayes model by default
-     */
-    public void fullTrainingTest(){
-	try {
-	    
-	    //Train classifier
-	    long startTime = System.currentTimeMillis();
-	    long endTime   = System.currentTimeMillis();
-	    
-	    //Evaluate classifier
-	    eval = new Evaluation(Data);
-	    long startT = System.currentTimeMillis();
-	    eval.evaluateModel(Model, Data);
-	    long endT   = System.currentTimeMillis();
-	    
-	    //Print statistics
-	    printResult(1,startTime,endTime,startT,endT);
-	    
-	} catch(Exception ex) {
-	    System.out.println(ex);
-	}
     }
 }
