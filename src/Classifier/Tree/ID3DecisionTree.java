@@ -13,7 +13,6 @@ import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import weka.core.Attribute;
-import weka.core.AttributeStats;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.filters.Filter;
@@ -27,14 +26,25 @@ import weka.filters.unsupervised.instance.RemoveWithValues;
  */
 public class ID3DecisionTree {
     
+    /** The parent of this node */
     protected final ID3DecisionTree parent;
+    
+    /** The training data used to make this node (and its subtrees) */
     protected final Instances nodeTrainingData;
     
     protected boolean isLeaf;
+    
+    /** List of subtree of this node indexed by its ID */
     protected ArrayList<ID3DecisionTree> subTrees;
     
     /** The attribute ID used to separate the data at this node */
     protected Attribute splitterAttribute;
+    
+    /** The splitter that contains mapping of value to the subtree ID
+     * If splitterAttribute is Nominal, contain direct mapping of value to ID
+     * If Numeric, contain list of upperBound value and the mapping to ID (up to Double.MAX_VALUE)
+     * ex. 13 -> 1, 17 -> 2, Inf -> 3, then 5 is mapped to 1, 14 to 2, and 19 to 3
+     */
     protected TreeMap<Double, Integer> splitterMap;
     
     
@@ -60,7 +70,6 @@ public class ID3DecisionTree {
 	
 	isLeaf = false;
 	splitterAttribute = nodeTrainingData.attribute(attID);;
-
 	Enumeration<Object> values = splitterAttribute.enumerateValues();
 	int i = 0;
 
@@ -70,17 +79,19 @@ public class ID3DecisionTree {
 	    subTrees.add(null);
 	    i++;
 	}
-
+	
+	// Setup subtrees according to the splitter
 	setupSubTrees();
     }
     
     /**
-     * Will initialize the subtree according to the splitterAttribute
+     * Setup the subtrees according to the defined splitter
      * @throws Exception
      */
     protected void setupSubTrees() throws Exception {
 	RemoveWithValues removeFilter = new RemoveWithValues();
 	removeFilter.setInvertSelection(true);
+	removeFilter.setMatchMissingValues(false);
 	
 	for(Map.Entry<Double, Integer> entry : splitterMap.entrySet()) {
 	    removeFilter.setAttributeIndex("" + (splitterAttribute.index()+1));
@@ -160,7 +171,6 @@ public class ID3DecisionTree {
 	    return "";
 	}
     }
-    
     public String toString(int level) throws Exception {
 	StringBuilder sb = new StringBuilder();
 	if(!isLeaf()) {
@@ -185,5 +195,9 @@ public class ID3DecisionTree {
 	    sb.append("   ");
 	}
 	return sb.toString();
+    }
+    
+    protected void appendData(Instances data) {
+	nodeTrainingData.addAll(data.subList(0, data.size()));
     }
 }
