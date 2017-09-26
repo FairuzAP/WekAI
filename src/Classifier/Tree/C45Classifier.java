@@ -7,7 +7,7 @@ package Classifier.Tree;
 
 import java.util.ArrayList;
 import java.util.Enumeration;
-import weka.classifiers.AbstractClassifier;
+import weka.classifiers.Evaluation;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -16,23 +16,15 @@ import weka.core.Instances;
  *
  * @author USER
  */
-public class ID3Classifier extends AbstractClassifier {
-    
-    /** The training data used by the classifier */
-    protected Instances trainingData;
-    
-    /** The root node of the classifier tree */
-    protected ID3DecisionTree root;
+public class C45Classifier extends ID3Classifier {
     
     @Override
     public void buildClassifier(Instances data) throws Exception {
 	// Remove instance with missing class value
-	data.deleteWithMissingClass();
-	
-	// TODO: Check missing value and numeric attributes
-	
         trainingData = data;
-	root = new ID3DecisionTree(null, trainingData);
+	trainingData.deleteWithMissingClass();
+
+	root = new C45DecisionTree(null, trainingData);
 	setupTree(root);
 	System.out.println(root);
     }
@@ -43,6 +35,7 @@ public class ID3Classifier extends AbstractClassifier {
      * @param node The node to be build
      * @throws Exception
      */
+    @Override
     protected void setupTree(ID3DecisionTree node) throws Exception {
 	Instances data = node.getNodeData();
 	if(!data.isEmpty()) {
@@ -52,11 +45,17 @@ public class ID3Classifier extends AbstractClassifier {
 	    // Find the best attribute to be used at this node
 	    for(int i=0; i<data.numAttributes(); i++) {
 		if(i != data.classIndex()) {
+		    double currentInformationGain = 0.0;
 		    
-		    double currentInformationGain = countNominalInformationGain(data, i);
-		    if(currentInformationGain > bestInformationGain) {
-			bestInformationGain = currentInformationGain;
-			bestAttributeID = i;
+		    if(data.attribute(i).isNominal()) {
+			currentInformationGain = countNominalGainRatio(data, i);
+			if(currentInformationGain > bestInformationGain) {
+			    bestInformationGain = currentInformationGain;
+			    bestAttributeID = i;
+			}
+			
+		    } else {
+			// TODO: get best IG if numeric
 		    }
 		    
 		}
@@ -65,7 +64,11 @@ public class ID3Classifier extends AbstractClassifier {
 	    // If there is an attribute that can be used to further classify the
 	    // data, set it as this node splitter and setup each of its child
 	    if(bestAttributeID != -1) {
-		node.SetNominalSplitter(bestAttributeID);
+		if(data.attribute(bestAttributeID).isNominal()) {
+		    node.SetNominalSplitter(bestAttributeID);
+		} else {
+		    // TODO: Set Splitter if numeric
+		}
 		ArrayList<ID3DecisionTree> subTrees = node.getSubTrees();
 		
 		for(int i=0; i<subTrees.size(); i++) {
@@ -76,10 +79,35 @@ public class ID3Classifier extends AbstractClassifier {
     }
     
     /**
+     * Recursively trim the tree starting at the bottom using the supplied test data
+     * @throws java.lang.Exception
+     */
+    protected void trimTree(Instances testData) throws Exception {
+	trimTree((C45DecisionTree) root, testData);
+    }
+    private void trimTree(C45DecisionTree node, Instances testData) throws Exception {
+	if(!node.isLeaf()) {
+	    for(int i=0; i<node.getSubTrees().size(); i++) {
+		trimTree((C45DecisionTree) node.getSubTrees().get(i), testData);
+	    }
+	    
+	    Evaluation old_eval = new Evaluation(trainingData);
+	    old_eval.evaluateModel(this, testData);
+	    node.isLeaf = true;
+	    Evaluation new_eval = new Evaluation(trainingData);
+	    new_eval.evaluateModel(this, testData);
+	    
+	    if(old_eval.errorRate() < new_eval.errorRate()) {
+		node.isLeaf = false;
+	    }
+	}
+    }
+    
+    /**
      * Count the nominal information gain for the given attributes
      * @throws Exception
      */
-    private double countNominalInformationGain(Instances nodeData, int attID) throws Exception {
+    private double countNominalGainRatio(Instances nodeData, int attID) throws Exception {
 	Instances data = new Instances(nodeData);
 	Attribute att = data.attribute(attID);
 	Attribute classAtt = data.classAttribute();
@@ -122,41 +150,16 @@ public class ID3Classifier extends AbstractClassifier {
 	    }
 	}
 	
-	return result;
-    }
-    
-    @Override
-    public final double[] distributionForInstance(Instance instance) throws Exception {
-	
-	// TODO: Check missing value and numeric attributes
-	
-	ID3DecisionTree currTree = root;
-	while(true) {
-	    
-	    if(currTree.isLeaf) {
-		double[] classDistribution = currTree.getClassDistribution();
-		return classDistribution;
-	    
-	    } else {
-		double[] subTreeDist = currTree.getSubTreeDistribution(instance);
-		
-		double max = 0;
-		int maxID = -1;
-		for(int i=0; i<subTreeDist.length; i++) {
-		    if(subTreeDist[i] > max) {
-			maxID = i;
-			max = subTreeDist[i];
-		    }
-		}
-		
-		if(maxID != -1) {
-		    currTree = currTree.getSubTrees().get(maxID);
-		} else {
-		    double[] classDistribution = currTree.getClassDistribution();
-		    return classDistribution;
-		}
+	// Calculate the chosen attribute entropy
+	double attEntropy = 0;
+	for(int i=0; i<attCount.length; i++) {
+	    double prob = (double)attCount[i] / (double)data.size();
+	    if(prob > 0) {
+		attEntropy -= prob * (Math.log10(prob) / Math.log10(2));
 	    }
 	}
+	
+	return result/attEntropy;
     }
     
 }

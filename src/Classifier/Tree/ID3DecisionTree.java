@@ -104,7 +104,7 @@ public class ID3DecisionTree {
 	}
     }
     
-    public final ArrayList<ID3DecisionTree> getSubTrees() throws Exception {
+    public final ArrayList<ID3DecisionTree> getSubTrees() {
 	return subTrees;
     }
     public final Instances getNodeData() throws Exception {

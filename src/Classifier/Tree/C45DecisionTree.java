@@ -37,7 +37,7 @@ public class C45DecisionTree extends ID3DecisionTree {
 	subTrees.clear();
 	
 	isLeaf = false;
-	splitterAttribute = nodeTrainingData.attribute(attID);;
+	splitterAttribute = nodeTrainingData.attribute(attID);
 	
 	for(int i=0; i<boundaries.length; i++) {
 	    splitterMap.put(boundaries[i], i);
@@ -50,6 +50,11 @@ public class C45DecisionTree extends ID3DecisionTree {
 	setupSubTrees();
     }
     
+    /**
+     * Extend the ID3 method to add handler for continuous attributes, and
+     * missing attributes value for the selected splitter
+     * @throws Exception
+     */
     @Override
     protected void setupSubTrees() throws Exception {
 	if(splitterAttribute.isNumeric()) {
@@ -104,7 +109,8 @@ public class C45DecisionTree extends ID3DecisionTree {
     }
     
     /**
-     * If this node is a leaf or numeric node, will return an empty array,
+     * Extend the previous method to add handler for continuous attributes
+     * and for missing splitter attributes value
      * @param data The instance to be classified
      * @return The weight distribution array of the node's subtree according to the instance
      */
