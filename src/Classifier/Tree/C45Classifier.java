@@ -40,24 +40,28 @@ public class C45Classifier extends ID3Classifier {
 	Instances data = node.getNodeData();
 	if(!data.isEmpty()) {
 	    int bestAttributeID = -1;
+	    double bestNumericBoundaries[] = null;
 	    double bestInformationGain = 0;
 	    
 	    // Find the best attribute to be used at this node
 	    for(int i=0; i<data.numAttributes(); i++) {
 		if(i != data.classIndex()) {
 		    double currentInformationGain = 0.0;
+		    double currentNumericBoundaries[] = null;
 		    
 		    if(data.attribute(i).isNominal()) {
 			currentInformationGain = countNominalGainRatio(data, i);
-			if(currentInformationGain > bestInformationGain) {
-			    bestInformationGain = currentInformationGain;
-			    bestAttributeID = i;
-			}
-			
 		    } else {
-			// TODO: get best IG if numeric
+			// TODO: get best IG and numericBoundaries if numeric
 		    }
 		    
+		    if(currentInformationGain > bestInformationGain) {
+			bestInformationGain = currentInformationGain;
+			bestAttributeID = i;
+			if(data.attribute(bestAttributeID).isNumeric()) {
+			    bestNumericBoundaries = currentNumericBoundaries;
+			}
+		    }		    
 		}
 	    }
 	    
@@ -67,10 +71,10 @@ public class C45Classifier extends ID3Classifier {
 		if(data.attribute(bestAttributeID).isNominal()) {
 		    node.SetNominalSplitter(bestAttributeID);
 		} else {
-		    // TODO: Set Splitter if numeric
+		    ((C45DecisionTree)node).SetNumericSplitter(bestAttributeID, bestNumericBoundaries);
 		}
-		ArrayList<ID3DecisionTree> subTrees = node.getSubTrees();
 		
+		ArrayList<ID3DecisionTree> subTrees = node.getSubTrees();
 		for(int i=0; i<subTrees.size(); i++) {
 		    setupTree(subTrees.get(i));
 		}
@@ -80,6 +84,7 @@ public class C45Classifier extends ID3Classifier {
     
     /**
      * Recursively trim the tree starting at the bottom using the supplied test data
+     * @param testData The validation data used for trimming
      * @throws java.lang.Exception
      */
     protected void trimTree(Instances testData) throws Exception {
@@ -140,9 +145,9 @@ public class C45Classifier extends ID3Classifier {
 	
 	// Substract the class entropy with each partial entropy of att 
 	for(int i=0; i<attCount.length; i++) {
-	    for(int j=0; j<attClassCount.length; j++) {
+	    for (int[] attClassCount1 : attClassCount) {
 		double temp = 0;
-		double prob = (double)attClassCount[j][i] / (double)attCount[i];
+		double prob = (double) attClassCount1[i] / (double)attCount[i];
 		if(prob > 0) {
 		    temp -= prob * (Math.log10(prob) / Math.log10(2));
 		}

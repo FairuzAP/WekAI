@@ -112,9 +112,9 @@ public class ID3Classifier extends AbstractClassifier {
 	
 	// Substract the class entropy with each partial entropy of att 
 	for(int i=0; i<attCount.length; i++) {
-	    for(int j=0; j<attClassCount.length; j++) {
+	    for (int[] attClassCount1 : attClassCount) {
 		double temp = 0;
-		double prob = (double)attClassCount[j][i] / (double)attCount[i];
+		double prob = (double) attClassCount1[i] / (double)attCount[i];
 		if(prob > 0) {
 		    temp -= prob * (Math.log10(prob) / Math.log10(2));
 		}

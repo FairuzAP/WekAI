@@ -69,7 +69,7 @@ public class ID3DecisionTree {
 	subTrees.clear();
 	
 	isLeaf = false;
-	splitterAttribute = nodeTrainingData.attribute(attID);;
+	splitterAttribute = nodeTrainingData.attribute(attID);
 	Enumeration<Object> values = splitterAttribute.enumerateValues();
 	int i = 0;
 
