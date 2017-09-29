@@ -29,7 +29,15 @@ public class ID3Classifier extends AbstractClassifier {
 	// Remove instance with missing class value
 	data.deleteWithMissingClass();
 	
-	// TODO: Check missing value and numeric attributes
+	if(data.classAttribute().isNumeric()) {
+	    throw new Exception("Numeric Class attributes not supported");
+	}
+	Enumeration<Attribute> attributes = data.enumerateAttributes();
+	while(attributes.hasMoreElements()) {
+	    if(attributes.nextElement().isNumeric()) {
+		throw new Exception("Numeric attributes not supported");
+	    }
+	}
 	
         trainingData = data;
 	root = new ID3DecisionTree(null, trainingData);
@@ -83,7 +91,6 @@ public class ID3Classifier extends AbstractClassifier {
 	Instances data = new Instances(nodeData);
 	Attribute att = data.attribute(attID);
 	Attribute classAtt = data.classAttribute();
-	data.deleteWithMissing(attID);
 	
 	// The number of instances with [index] class value
 	int[] classCount = new int[classAtt.numValues()];
@@ -97,6 +104,9 @@ public class ID3Classifier extends AbstractClassifier {
 	while(instances.hasMoreElements()) {
 	    Instance instance = instances.nextElement();
 	    classCount[(int)instance.classValue()] += 1;
+	    if(instance.isMissing(att)) {
+		throw new Exception("Missing value is not supported");
+	    }
 	    attClassCount[(int)instance.classValue()][(int)instance.value(attID)] += 1;
 	    attCount[(int)instance.value(attID)] += 1;
 	}
@@ -128,8 +138,10 @@ public class ID3Classifier extends AbstractClassifier {
     @Override
     public final double[] distributionForInstance(Instance instance) throws Exception {
 	
-	// TODO: Check missing value and numeric attributes
-	
+	if(!instance.equalHeaders(trainingData.firstInstance())) {
+	    throw new Exception("Instance header is not equal to training data");
+	}
+		
 	ID3DecisionTree currTree = root;
 	while(true) {
 	    
