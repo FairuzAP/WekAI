@@ -133,8 +133,10 @@ public class C45Classifier extends ID3Classifier {
 	public int compare(Rule o1, Rule o2) {
 	    if(o1.errorRate > o2.errorRate) {
 		return 1;
-	    } else {
+	    } else if(o1.errorRate < o2.errorRate) {
 		return -1;
+	    } else {
+		return 0;
 	    }
 	}
     
@@ -155,7 +157,7 @@ public class C45Classifier extends ID3Classifier {
 	removeFilt.setPercentage(10);
 	removeFilt.setInvertSelection(false);
 	removeFilt.setInputFormat(data);
-	trainingData = Filter.useFilter(data, removeFilt);;
+	trainingData = Filter.useFilter(data, removeFilt);
 	
 	root = new C45DecisionTree(null, trainingData);
 	setupTree(root);
@@ -229,10 +231,10 @@ public class C45Classifier extends ID3Classifier {
 	ruleSet = new ArrayList<>();
 	parseTreeToRules((C45DecisionTree) root, new ArrayList<>());
 	
-	System.out.println(ruleSet);
-	for(int i=0; i< ruleSet.size(); i++) {
-	    ruleSet.set(i, trimRule(ruleSet.get(i)));
-	}
+//	System.out.println(ruleSet);
+//	for(int i=0; i< ruleSet.size(); i++) {
+//	    ruleSet.set(i, trimRule(ruleSet.get(i)));
+//	}
 	
 	RuleComparator c = new RuleComparator();
 	ruleSet.sort(c);
@@ -499,13 +501,13 @@ public class C45Classifier extends ID3Classifier {
 	return res;
     }
     
-//    @Override
-//    public double[] distributionForInstance(Instance instance) throws Exception {
-//	for(Rule r : ruleSet) {
-//	    if(r.isValid(instance)) {
-//		return r.classDistribution;
-//	    }
-//	}
-//	return ruleSet.get(0).classDistribution;
-//    }
+    @Override
+    public double[] distributionForInstance(Instance instance) throws Exception {
+	for(Rule r : ruleSet) {
+	    if(r.isValid(instance)) {
+		return r.classDistribution;
+	    }
+	}
+	return ruleSet.get(0).classDistribution;
+    }
 }
