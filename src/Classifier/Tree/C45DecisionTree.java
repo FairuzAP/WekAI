@@ -7,6 +7,7 @@ package Classifier.Tree;
 
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import weka.core.Attribute;
@@ -63,35 +64,41 @@ public class C45DecisionTree extends ID3DecisionTree {
 	    removeFilter.setMatchMissingValues(false);
 	    Iterator<Double> keys = splitterMap.navigableKeySet().iterator();
 
-	    double prev = Double.NaN, curr;
+	    double prev = Double.MIN_VALUE, curr;
 	    while(keys.hasNext()) {
 		curr = keys.next();
 		removeFilter.setInvertSelection(true);
 		removeFilter.setAttributeIndex("" + (splitterAttribute.index()+1));
 		removeFilter.setSplitPoint(curr);
 		removeFilter.setInputFormat(nodeTrainingData);
-
+		
 		Instances subData = Filter.useFilter(nodeTrainingData, removeFilter);
-		if(prev != Double.NaN) {
+		if(prev != Double.MIN_VALUE) {
 		    removeFilter.setInvertSelection(false);
 		    removeFilter.setSplitPoint(prev);
 		    removeFilter.setInputFormat(subData);
-		    subData = Filter.useFilter(nodeTrainingData, removeFilter);
+		    subData = Filter.useFilter(subData, removeFilter);
 		}
 		subData.deleteAttributeAt(splitterAttribute.index());
 
-		subTrees.set(splitterMap.get(curr), new ID3DecisionTree(this, subData));
+		subTrees.set(splitterMap.get(curr), new C45DecisionTree(this, subData));
 		prev = curr;
 	    }
 
-	    removeFilter.setInvertSelection(false);
-	    removeFilter.setSplitPoint(prev);
-	    removeFilter.setInputFormat(nodeTrainingData);
-	    Instances subData = Filter.useFilter(nodeTrainingData, removeFilter);
-	    subTrees.set(splitterMap.get(Double.MAX_VALUE), new ID3DecisionTree(this, subData));
-	
 	} else {
-	    super.getSubTrees();
+	    RemoveWithValues removeFilter = new RemoveWithValues();
+	    removeFilter.setInvertSelection(true);
+	    removeFilter.setMatchMissingValues(false);
+
+	    for(Map.Entry<Double, Integer> entry : splitterMap.entrySet()) {
+		removeFilter.setAttributeIndex("" + (splitterAttribute.index()+1));
+		removeFilter.setNominalIndices("" + (entry.getKey().intValue()+1));
+		removeFilter.setInputFormat(nodeTrainingData);
+
+		Instances subData = Filter.useFilter(nodeTrainingData, removeFilter);
+		subData.deleteAttributeAt(splitterAttribute.index());
+		subTrees.set(entry.getValue(), new C45DecisionTree(this, subData));	    
+	    }
 	}
 	
 	// Add instances with missing attributes to the most common subtree
@@ -118,29 +125,27 @@ public class C45DecisionTree extends ID3DecisionTree {
     public double[] getSubTreeDistribution(Instance data) {
 	double[] res = new double[subTrees.size()];
 	if(splitterAttribute != null) {
-	    if(splitterAttribute.isNominal()) {
-		Enumeration<Attribute> attributes = data.enumerateAttributes();
+	    Enumeration<Attribute> attributes = data.enumerateAttributes();
 
-		while(attributes.hasMoreElements()) {
-		    Attribute nextAttributes = attributes.nextElement();
-		    if(nextAttributes.name().equals(splitterAttribute.name())) {
-			
-			if(!data.isMissing(nextAttributes)) {
-			    
-			    if(splitterAttribute.isNominal()) {
-				String val = data.stringValue(nextAttributes); 
-				Double key = (double)splitterAttribute.indexOfValue(val);
-				res[splitterMap.get(key)] = 1.0;
-			    } else {
-				Double key = splitterMap.ceilingKey(data.value(nextAttributes));
-				res[splitterMap.get(key)] = 1.0;
-			    }
-			    
+	    while(attributes.hasMoreElements()) {
+		Attribute nextAttributes = attributes.nextElement();
+		if(nextAttributes.name().equals(splitterAttribute.name())) {
+
+		    if(!data.isMissing(nextAttributes)) {
+
+			if(splitterAttribute.isNominal()) {
+			    String val = data.stringValue(nextAttributes); 
+			    Double key = (double)splitterAttribute.indexOfValue(val);
+			    res[splitterMap.get(key)] = 1.0;
 			} else {
-			    res[getMostCommonSubTreeIndex()] = 1.0;
+			    Double key = splitterMap.ceilingKey(data.value(nextAttributes));
+			    res[splitterMap.get(key)] = 1.0;
 			}
-			
+
+		    } else {
+			res[getMostCommonSubTreeIndex()] = 1.0;
 		    }
+
 		}
 	    }
 	}

@@ -6,11 +6,18 @@
 package Classifier.Tree;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import weka.classifiers.Evaluation;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
+import javafx.util.Pair;
+
 
 /**
  *
@@ -52,7 +59,9 @@ public class C45Classifier extends ID3Classifier {
 		    if(data.attribute(i).isNominal()) {
 			currentInformationGain = countNominalGainRatio(data, i);
 		    } else {
-			// TODO: get best IG and numericBoundaries if numeric
+			Pair<Double, Double> res = getNumericInformationGain(data, i);
+			currentInformationGain = res.getKey();
+			currentNumericBoundaries = new double[]{res.getValue()};
 		    }
 		    
 		    if(currentInformationGain > bestInformationGain) {
@@ -61,7 +70,7 @@ public class C45Classifier extends ID3Classifier {
 			if(data.attribute(bestAttributeID).isNumeric()) {
 			    bestNumericBoundaries = currentNumericBoundaries;
 			}
-		    }		    
+		    }
 		}
 	    }
 	    
@@ -109,7 +118,7 @@ public class C45Classifier extends ID3Classifier {
     }
     
     /**
-     * Count the nominal information gain for the given attributes
+     * Count the nominal gain ratio for the given nominal attributes
      * @throws Exception
      */
     private double countNominalGainRatio(Instances nodeData, int attID) throws Exception {
@@ -165,6 +174,111 @@ public class C45Classifier extends ID3Classifier {
 	}
 	
 	return result/attEntropy;
+    }
+    
+    /**
+     * Count the information gain for the given numeric attributes, and
+     * return a tuple of the IG and splitter point
+     */
+    private Pair<Double,Double> getNumericInformationGain(Instances nodeData, int attID) {
+	Instances data = new Instances(nodeData);
+	Attribute att = data.attribute(attID);
+	Attribute classAtt = data.classAttribute();
+	data.deleteWithMissing(attID);
+	data.sort(att);
+	
+	// The number of instances with [index] class value
+	int[] classCount = new int[classAtt.numValues()];
+	
+	class StatHolder {
+	    // The number of instances with attValue < splitPoint and [index] class value
+	    public int[][] attClassCount;
+	    public int[] attCount;
+	    
+	    @Override
+	    public String toString() {
+		try {
+		    return Arrays.deepToString(attClassCount);
+		} catch (Exception ex) {
+		    Logger.getLogger(ID3DecisionTree.class.getName()).log(Level.SEVERE, null, ex);
+		    return "";
+		}
+	    }
+	}
+	
+	// Mapping of potential splitPoints and it stats
+	TreeMap<Double, StatHolder> dataStats = new TreeMap<>();
+	double lastClass = data.firstInstance().classValue();
+	StatHolder next = new StatHolder();
+	next.attClassCount = new int[classAtt.numValues()][2];
+	next.attCount = new int[2];
+	dataStats.put(data.firstInstance().value(att), next);
+	
+	// Count the data distributions
+	Enumeration<Instance> instances = data.enumerateInstances();
+	while(instances.hasMoreElements()) {
+	    Instance instance = instances.nextElement();
+	    double currClass = instance.classValue();
+	    double currAtt = instance.value(att);
+	    classCount[(int)currClass] += 1;
+	    
+	    if(currClass != lastClass) {
+		next = new StatHolder();
+		next.attClassCount = new int[classAtt.numValues()][2];
+		next.attCount = new int[2];
+		StatHolder prev = dataStats.get(dataStats.floorKey(currAtt));
+		for(int i=0; i<classAtt.numValues(); i++) {
+		    next.attClassCount[i][0] = prev.attClassCount[i][0]+prev.attClassCount[i][1];
+		    next.attCount[0] += prev.attClassCount[i][0]+prev.attClassCount[i][1];
+		}
+		dataStats.put(currAtt, next);
+	    }
+	    
+	    dataStats.entrySet().stream().forEach((entry) -> {
+		entry.getValue().attClassCount[(int)currClass][1] += 1;
+		entry.getValue().attCount[1] += 1;
+	    });
+	    lastClass = currClass;
+	}
+	
+	// Calculate the class Attribute entropy
+	double result = 0;
+	for(int i=0; i<classCount.length; i++) {
+	    double prob = (double)classCount[i] / (double)data.size();
+	    if(prob > 0) {
+		result -= prob * (Math.log10(prob) / Math.log10(2));
+	    }
+	}
+	
+	double bestIG = 0;
+	double bestSplitter = -1;
+	
+	for(Map.Entry<Double, StatHolder> entry : dataStats.entrySet()) {
+	    
+	    StatHolder value = entry.getValue();
+	    double tempResult = result;
+	    
+	    // Substract the class entropy with each partial entropy of att 
+	    for(int i=0; i<value.attCount.length; i++) {
+		for (int[] attClassCount1 : value.attClassCount) {
+		    double temp = 0;
+		    double prob = (double) attClassCount1[i] / (double)value.attCount[i];
+		    if(prob > 0) {
+			temp -= prob * (Math.log10(prob) / Math.log10(2));
+		    }
+		    tempResult -= ((double)value.attCount[i] / (double)data.size()) * temp;
+		}
+	    }
+	    
+	    if(tempResult > bestIG) {
+		bestIG = tempResult;
+		bestSplitter = entry.getKey();
+	    }
+	    
+	}
+	
+	Pair<Double,Double> res = new Pair<>(bestIG, bestSplitter);
+	return res;
     }
     
 }

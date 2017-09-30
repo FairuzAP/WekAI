@@ -5,6 +5,7 @@
  */
 package wekai;
 
+import Classifier.Tree.C45Classifier;
 import weka.classifiers.trees.J48;
 import Classifier.Tree.ID3Classifier;
 import java.util.logging.Level;
@@ -23,11 +24,10 @@ public class WekAI {
 	try {
 	    
 	    WekaHandler w = new WekaHandler();
-	    w.readTrainingData("C:/Program Files/Weka-3-8/data/contact-lenses.arff");
-	    ID3Classifier id3 = new ID3Classifier();
-	    J48 j = new J48();
+	    w.readTrainingData("C:/Program Files/Weka-3-8/data/iris.arff");
+	    ID3Classifier model = new C45Classifier();
 	    
-	    w.Model = id3;
+	    w.Model = model;
 	    w.fullTraining(true);
 
 	} catch (Exception ex) {
