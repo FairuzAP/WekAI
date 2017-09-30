@@ -79,7 +79,7 @@ public class C45Classifier extends ID3Classifier {
     protected class Rule {
 	ArrayList<Constraint> constraint;
 	double[] classDistribution;
-	double errorRate;
+	double accuracy;
 	
 	public boolean isValid(Instance instance) {
 	    boolean valid = true;
@@ -95,7 +95,7 @@ public class C45Classifier extends ID3Classifier {
 	@Override
 	public String toString() {
 	    try {
-		return constraint.toString() + " -> " + Arrays.toString(classDistribution) + ", e=" + errorRate + "\n";
+		return constraint.toString() + " -> " + Arrays.toString(classDistribution) + ", a=" + accuracy + "\n";
 	    } catch (Exception ex) {
 		Logger.getLogger(ID3DecisionTree.class.getName()).log(Level.SEVERE, null, ex);
 		return "";
@@ -131,10 +131,10 @@ public class C45Classifier extends ID3Classifier {
 
 	@Override
 	public int compare(Rule o1, Rule o2) {
-	    if(o1.errorRate > o2.errorRate) {
-		return 1;
-	    } else if(o1.errorRate < o2.errorRate) {
+	    if(o1.accuracy > o2.accuracy) {
 		return -1;
+	    } else if(o1.accuracy < o2.accuracy) {
+		return 1;
 	    } else {
 		return 0;
 	    }
@@ -231,10 +231,9 @@ public class C45Classifier extends ID3Classifier {
 	ruleSet = new ArrayList<>();
 	parseTreeToRules((C45DecisionTree) root, new ArrayList<>());
 	
-//	System.out.println(ruleSet);
-//	for(int i=0; i< ruleSet.size(); i++) {
-//	    ruleSet.set(i, trimRule(ruleSet.get(i)));
-//	}
+	for(int i=0; i< ruleSet.size(); i++) {
+	    ruleSet.set(i, trimRule(ruleSet.get(i)));
+	}
 	
 	RuleComparator c = new RuleComparator();
 	ruleSet.sort(c);
@@ -253,7 +252,7 @@ public class C45Classifier extends ID3Classifier {
 	    classifier.rule = r;
 	    Evaluation currEval = new Evaluation(trainingData);
 	    currEval.evaluateModel(classifier, validationData);
-	    r.errorRate = currEval.errorRate()+(currEval.unclassified()/currEval.numInstances());
+	    r.accuracy = (currEval.correct()/currEval.numInstances());
 	    
 	    ruleSet.add(r);
 	    
@@ -299,7 +298,7 @@ public class C45Classifier extends ID3Classifier {
 	
 	Evaluation currEval = new Evaluation(trainingData);
 	currEval.evaluateModel(classifier, validationData);
-	double prevError = currEval.errorRate()+(currEval.unclassified()/currEval.numInstances());
+	double prevError = (currEval.correct()/currEval.numInstances());
 	
 	for(Constraint c : rule.constraint) {
 	    Rule nextRule = new Rule();
@@ -310,12 +309,12 @@ public class C45Classifier extends ID3Classifier {
 	    
 	    currEval = new Evaluation(trainingData);
 	    currEval.evaluateModel(classifier, validationData);
-	    if(prevError > (currEval.errorRate()+(currEval.unclassified()/currEval.numInstances()))) {
+	    if(prevError < (currEval.correct()/currEval.numInstances())) {
 		return trimRule(nextRule);
 	    }
 	}
 	
-	rule.errorRate = prevError;
+	rule.accuracy = prevError;
 	return rule;
     }
     
