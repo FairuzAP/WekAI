@@ -136,7 +136,7 @@ public class ID3Classifier extends AbstractClassifier {
     }
     
     @Override
-    public final double[] distributionForInstance(Instance instance) throws Exception {
+    public double[] distributionForInstance(Instance instance) throws Exception {
 	
 	if(!instance.equalHeaders(trainingData.firstInstance())) {
 	    throw new Exception("Instance header is not equal to training data");

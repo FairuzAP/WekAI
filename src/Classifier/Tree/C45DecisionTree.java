@@ -5,6 +5,8 @@
  */
 package Classifier.Tree;
 
+import static Classifier.Tree.ID3DecisionTree.tabLevel;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
@@ -170,5 +172,29 @@ public class C45DecisionTree extends ID3DecisionTree {
 	    }
 	}
 	return res;
+    }
+    
+    @Override
+    public String toString(int level) throws Exception {
+	StringBuilder sb = new StringBuilder();
+	if(!isLeaf()) {
+	    sb.append(tabLevel(level));
+	    sb.append(String.format("Separator = %s\n", nodeTrainingData.attribute(splitterAttribute.index())));
+	    for(Map.Entry<Double, Integer> entry : splitterMap.entrySet()) {
+		sb.append(tabLevel(level));
+		if(splitterAttribute.isNominal()) {
+		    sb.append(String.format("Case %s,\n", nodeTrainingData.attribute(splitterAttribute.index()).value(entry.getKey().intValue())));
+		} else {
+		    sb.append(String.format("Case ... > x >= %s,\n", entry.getKey()));
+		}
+		sb.append(subTrees.get(entry.getValue()).toString(level + 1));
+	    }
+	} else {
+	    sb.append(tabLevel(level));
+	    sb.append("Leaf Node: ");
+	    sb.append(Arrays.toString(getClassDistribution()));
+	    sb.append("\n");
+	}
+	return sb.toString();
     }
 }

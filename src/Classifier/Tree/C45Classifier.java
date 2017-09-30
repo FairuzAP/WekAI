@@ -7,8 +7,10 @@ package Classifier.Tree;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.Map;
+import java.util.Random;
 import java.util.TreeMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -16,7 +18,10 @@ import weka.classifiers.Evaluation;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.filters.unsupervised.instance.RemovePercentage ;
 import javafx.util.Pair;
+import weka.classifiers.AbstractClassifier;
+import weka.filters.Filter;
 
 
 /**
@@ -25,15 +30,139 @@ import javafx.util.Pair;
  */
 public class C45Classifier extends ID3Classifier {
     
+    // The data to be used for trimming / testing model
+    protected Instances validationData;
+    
+    protected class Constraint {
+	String attName;
+	double nominalValue;
+	double lowerNumericBound;
+	double upperNumericBound;
+	
+	public boolean isValid(Instance instance) {
+	    boolean valid = true;
+	    Enumeration<Attribute> attributes = instance.enumerateAttributes();
+	    while(attributes.hasMoreElements()) {
+		Attribute next = attributes.nextElement();
+		if(next.name().equals(attName)) {
+
+		    if(next.isNominal()) {
+			if(instance.value(next) != nominalValue) {
+			    valid = false;
+			}
+		    } else {
+			if(instance.value(next) <= lowerNumericBound || instance.value(next) > upperNumericBound) {
+			    valid = false;
+			}
+		    }
+		    break;
+
+		}
+	    }
+	    return valid;
+	}
+	
+	@Override
+	public String toString() {
+	    try {
+		if(nominalValue == -1) {
+		    return lowerNumericBound + " > " + attName + " >= " + upperNumericBound;
+		} else {
+		    return attName + " = " + nominalValue;
+		}
+	    } catch (Exception ex) {
+		Logger.getLogger(ID3DecisionTree.class.getName()).log(Level.SEVERE, null, ex);
+		return "";
+	    }
+	}
+    }
+    protected class Rule {
+	ArrayList<Constraint> constraint;
+	double[] classDistribution;
+	double errorRate;
+	
+	public boolean isValid(Instance instance) {
+	    boolean valid = true;
+	    for(Constraint c : constraint) {
+		if(!c.isValid(instance)) {
+		    valid = false;
+		    break;
+		}
+	    }
+	    return valid;
+	}
+	
+	@Override
+	public String toString() {
+	    try {
+		return constraint.toString() + " -> " + Arrays.toString(classDistribution) + ", e=" + errorRate + "\n";
+	    } catch (Exception ex) {
+		Logger.getLogger(ID3DecisionTree.class.getName()).log(Level.SEVERE, null, ex);
+		return "";
+	    }
+	}
+    }
+    protected ArrayList<Rule> ruleSet;
+    
+    protected class RuleClassifier extends AbstractClassifier {
+	protected Rule rule;
+	
+	@Override
+	public void buildClassifier(Instances data) throws Exception {
+	    // Do Nothing
+	}
+	
+	@Override
+	public final double[] distributionForInstance(Instance instance) throws Exception {
+	    if(!rule.isValid(instance)) {
+		double[] res = new double[rule.classDistribution.length];
+		for(int i=0; i<res.length; i++) {
+		    res[i] = 0.0;
+		}
+		return res;
+	    } else {
+		return rule.classDistribution;
+	    }
+	    
+	    
+	}
+    }
+    protected class RuleComparator implements Comparator<Rule> {
+
+	@Override
+	public int compare(Rule o1, Rule o2) {
+	    if(o1.errorRate > o2.errorRate) {
+		return 1;
+	    } else {
+		return -1;
+	    }
+	}
+    
+    }
+    
     @Override
     public void buildClassifier(Instances data) throws Exception {
 	// Remove instance with missing class value
-        trainingData = data;
-	trainingData.deleteWithMissingClass();
+        data.randomize(new Random(System.currentTimeMillis()));
+	data.deleteWithMissingClass();
+	RemovePercentage removeFilt = new RemovePercentage ();
 
+	removeFilt.setPercentage(10);
+	removeFilt.setInvertSelection(true);
+	removeFilt.setInputFormat(data);
+	validationData = Filter.useFilter(data, removeFilt);
+	
+	removeFilt.setPercentage(10);
+	removeFilt.setInvertSelection(false);
+	removeFilt.setInputFormat(data);
+	trainingData = Filter.useFilter(data, removeFilt);;
+	
 	root = new C45DecisionTree(null, trainingData);
 	setupTree(root);
+	trimTree(validationData);
+	
 	System.out.println(root);
+	System.out.println(ruleSet);
     }
     
     /**
@@ -97,21 +226,110 @@ public class C45Classifier extends ID3Classifier {
      * @throws java.lang.Exception
      */
     protected void trimTree(Instances testData) throws Exception {
-	trimTree((C45DecisionTree) root, testData);
+	ruleSet = new ArrayList<>();
+	parseTreeToRules((C45DecisionTree) root, new ArrayList<>());
+	
+	System.out.println(ruleSet);
+	for(int i=0; i< ruleSet.size(); i++) {
+	    ruleSet.set(i, trimRule(ruleSet.get(i)));
+	}
+	
+	RuleComparator c = new RuleComparator();
+	ruleSet.sort(c);
+	
+	reducedErrorPrune((C45DecisionTree) root);
     }
-    private void trimTree(C45DecisionTree node, Instances testData) throws Exception {
+    
+    private void parseTreeToRules(C45DecisionTree node, ArrayList<Constraint> constraints) throws Exception {
+	
+	if(node.isLeaf) {
+	    Rule r = new Rule();
+	    r.constraint = constraints;
+	    r.classDistribution = node.getClassDistribution();
+	    
+	    RuleClassifier classifier = new RuleClassifier();
+	    classifier.rule = r;
+	    Evaluation currEval = new Evaluation(trainingData);
+	    currEval.evaluateModel(classifier, validationData);
+	    r.errorRate = currEval.errorRate()+(currEval.unclassified()/currEval.numInstances());
+	    
+	    ruleSet.add(r);
+	    
+	} else {
+	    if(node.splitterAttribute.isNominal()) {
+		for(Map.Entry<Double, Integer> entry : node.splitterMap.entrySet()) {
+
+		    ArrayList<Constraint> nextList = new ArrayList<>();
+		    nextList.addAll(constraints);
+
+		    Constraint nextConstraint = new Constraint();
+		    nextConstraint.attName = node.splitterAttribute.name();
+		    nextConstraint.nominalValue = entry.getKey();
+
+		    nextList.add(nextConstraint);
+
+		    parseTreeToRules((C45DecisionTree) node.subTrees.get(entry.getValue()), nextList);
+		}
+	    } else {
+		double prevKey = Double.MIN_VALUE;
+		for(Map.Entry<Double, Integer> entry : node.splitterMap.entrySet()) {
+
+		    ArrayList<Constraint> nextList = new ArrayList<>();
+		    nextList.addAll(constraints);
+
+		    Constraint nextConstraint = new Constraint();
+		    nextConstraint.attName = node.splitterAttribute.name();
+		    nextConstraint.nominalValue = -1;
+		    nextConstraint.lowerNumericBound = prevKey;
+		    nextConstraint.upperNumericBound = entry.getKey();
+		    prevKey = entry.getKey();
+
+		    nextList.add(nextConstraint);
+
+		    parseTreeToRules((C45DecisionTree) node.subTrees.get(entry.getValue()), nextList);
+		}
+	    }
+	}	
+    }
+    private Rule trimRule(Rule rule) throws Exception {
+	RuleClassifier classifier = new RuleClassifier();
+	classifier.rule = rule;
+	
+	Evaluation currEval = new Evaluation(trainingData);
+	currEval.evaluateModel(classifier, validationData);
+	double prevError = currEval.errorRate()+(currEval.unclassified()/currEval.numInstances());
+	
+	for(Constraint c : rule.constraint) {
+	    Rule nextRule = new Rule();
+	    nextRule.constraint = new ArrayList<>(rule.constraint);
+	    nextRule.classDistribution = rule.classDistribution;
+	    nextRule.constraint.remove(c);
+	    classifier.rule = nextRule;
+	    
+	    currEval = new Evaluation(trainingData);
+	    currEval.evaluateModel(classifier, validationData);
+	    if(prevError > (currEval.errorRate()+(currEval.unclassified()/currEval.numInstances()))) {
+		return trimRule(nextRule);
+	    }
+	}
+	
+	rule.errorRate = prevError;
+	return rule;
+    }
+    
+    private void reducedErrorPrune(C45DecisionTree node) throws Exception {
 	if(!node.isLeaf()) {
 	    for(int i=0; i<node.getSubTrees().size(); i++) {
-		trimTree((C45DecisionTree) node.getSubTrees().get(i), testData);
+		reducedErrorPrune((C45DecisionTree) node.getSubTrees().get(i));
 	    }
 	    
 	    Evaluation old_eval = new Evaluation(trainingData);
-	    old_eval.evaluateModel(this, testData);
+	    old_eval.evaluateModel(this, validationData);
 	    node.isLeaf = true;
 	    Evaluation new_eval = new Evaluation(trainingData);
-	    new_eval.evaluateModel(this, testData);
+	    new_eval.evaluateModel(this, validationData);
 	    
-	    if(old_eval.errorRate() < new_eval.errorRate()) {
+	    if(old_eval.rootMeanSquaredError() < new_eval.rootMeanSquaredError()) {
 		node.isLeaf = false;
 	    }
 	}
@@ -281,4 +499,13 @@ public class C45Classifier extends ID3Classifier {
 	return res;
     }
     
+//    @Override
+//    public double[] distributionForInstance(Instance instance) throws Exception {
+//	for(Rule r : ruleSet) {
+//	    if(r.isValid(instance)) {
+//		return r.classDistribution;
+//	    }
+//	}
+//	return ruleSet.get(0).classDistribution;
+//    }
 }
