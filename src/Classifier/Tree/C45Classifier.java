@@ -33,6 +33,8 @@ public class C45Classifier extends ID3Classifier {
     // The data to be used for trimming / testing model
     protected Instances validationData;
     
+    protected boolean isRule;
+    
     protected class Constraint {
 	String attName;
 	double nominalValue;
@@ -238,7 +240,9 @@ public class C45Classifier extends ID3Classifier {
 	RuleComparator c = new RuleComparator();
 	ruleSet.sort(c);
 	
+	isRule = false;
 	reducedErrorPrune((C45DecisionTree) root);
+	isRule = true;
     }
     
     private void parseTreeToRules(C45DecisionTree node, ArrayList<Constraint> constraints) throws Exception {
@@ -300,17 +304,19 @@ public class C45Classifier extends ID3Classifier {
 	currEval.evaluateModel(classifier, validationData);
 	double prevError = (currEval.correct()/currEval.numInstances());
 	
-	for(Constraint c : rule.constraint) {
-	    Rule nextRule = new Rule();
-	    nextRule.constraint = new ArrayList<>(rule.constraint);
-	    nextRule.classDistribution = rule.classDistribution;
-	    nextRule.constraint.remove(c);
-	    classifier.rule = nextRule;
-	    
-	    currEval = new Evaluation(trainingData);
-	    currEval.evaluateModel(classifier, validationData);
-	    if(prevError < (currEval.correct()/currEval.numInstances())) {
-		return trimRule(nextRule);
+	if(rule.constraint.size() <= 1) {
+	    for(Constraint c : rule.constraint) {
+		Rule nextRule = new Rule();
+		nextRule.constraint = new ArrayList<>(rule.constraint);
+		nextRule.classDistribution = rule.classDistribution;
+		nextRule.constraint.remove(c);
+		classifier.rule = nextRule;
+
+		currEval = new Evaluation(trainingData);
+		currEval.evaluateModel(classifier, validationData);
+		if(prevError < (currEval.correct()/currEval.numInstances())) {
+		    return trimRule(nextRule);
+		}
 	    }
 	}
 	
@@ -502,11 +508,15 @@ public class C45Classifier extends ID3Classifier {
     
     @Override
     public double[] distributionForInstance(Instance instance) throws Exception {
-	for(Rule r : ruleSet) {
-	    if(r.isValid(instance)) {
-		return r.classDistribution;
+	if(isRule) {
+	    for(Rule r : ruleSet) {
+		if(r.isValid(instance)) {
+		    return r.classDistribution;
+		}
 	    }
+	    return ruleSet.get(0).classDistribution;
+	} else {
+	    return super.distributionForInstance(instance);
 	}
-	return ruleSet.get(0).classDistribution;
     }
 }

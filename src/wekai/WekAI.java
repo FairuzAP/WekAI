@@ -24,7 +24,7 @@ public class WekAI {
 	try {
 	    
 	    WekaHandler w = new WekaHandler();
-	    w.readTrainingData("C:/Program Files/Weka-3-8/data/iris.arff");
+	    w.readTrainingData("C:/Program Files/Weka-3-8/data/soybean.arff");
 	    ID3Classifier model = new C45Classifier();
 	    
 	    w.Model = model;
